@@ -16,6 +16,15 @@ more changes to make it work — now you can use it just like the original versi
 Versions run `vX.Y`. Every update bumps `Y` by one; when `Y` would reach 10 it rolls back to 0 and
 `X` goes up by one, so v1.9 is followed by v2.0.
 
+## Download
+
+| File | Use it for |
+|---|---|
+| [`Bedromatica-v1.0.mcaddon`](Bedromatica-v1.0.mcaddon) | One-tap install — open it and Minecraft imports both packs |
+| [`Bedromatica-v1.0.zip`](Bedromatica-v1.0.zip) | Same contents, for dropping the two pack folders in by hand |
+
+On GitHub, click the file then **Download raw file**. Both archives hold the same two packs.
+
 ---
 
 ## What's in the box

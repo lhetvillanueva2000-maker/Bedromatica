@@ -37,8 +37,8 @@ needed** — leave Beta APIs off.
 
 ### Install
 
-Download `Bedromatica-v1.0.mcaddon` and open it; Minecraft imports both packs. Then activate
-**Bedromatica** and **Bedromatica Resources** on your world.
+Download `Bedromatica-v1.0.mcaddon` from the repository root and open it; Minecraft imports both
+packs. Then activate **Bedromatica** and **Bedromatica Resources** on your world.
 
 `Bedromatica-v1.0.zip` holds the same two pack folders if you would rather drop them into
 `com.mojang/development_behavior_packs` and `development_resource_packs` by hand.
