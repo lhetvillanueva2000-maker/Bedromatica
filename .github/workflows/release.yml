@@ -1,0 +1,77 @@
+name: Release
+
+# Publishes the built archives to the Releases tab. Runs when the archives or
+# this workflow change, and can also be started by hand for a chosen version.
+on:
+  push:
+    branches:
+      - claude/bedromatica-opus5-prompt-gl95i3
+      - main
+    paths:
+      - 'Bedromatica-v*.zip'
+      - 'Bedromatica-v*.mcaddon'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to publish, e.g. v1.0'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        env:
+          REQUESTED: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${REQUESTED:-}" ]; then
+            tag="$REQUESTED"
+          else
+            # Derive it from the archive sitting in the repo root.
+            file=$(ls -1 Bedromatica-v*.mcaddon | sort -V | tail -1)
+            tag=$(basename "$file" .mcaddon | sed -E 's/^Bedromatica-//')
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Publishing $tag"
+
+      - name: Pull the notes for this version
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          awk -v tag="## $TAG" '
+            $0 == tag { grab = 1; next }
+            grab && /^## v/ { exit }
+            grab { print }
+          ' RELEASE_NOTES.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "Bedromatica $TAG" > notes.md
+          fi
+          cat notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          assets=$(ls -1 "Bedromatica-$TAG.zip" "Bedromatica-$TAG.mcaddon")
+          echo "$assets"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "Bedromatica $TAG" --notes-file notes.md
+            gh release upload "$TAG" $assets --clobber
+          else
+            gh release create "$TAG" $assets \
+              --title "Bedromatica $TAG" \
+              --notes-file notes.md \
+              --target "$GITHUB_SHA"
+          fi
+          gh release view "$TAG" --json tagName,name,url,assets
