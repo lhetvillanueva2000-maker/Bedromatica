@@ -8,9 +8,13 @@ more changes to make it work — now you can use it just like the original versi
 
 | | |
 |---|---|
+| Version | **v1.0** |
 | Target | Minecraft Bedrock **1.21.80** and above (preview 1.21.80.26 / engine 26.13) |
 | Script modules | `@minecraft/server` 1.19.0, `@minecraft/server-ui` 1.3.0 — both **stable**, no experiments |
 | Namespace | `bedromatica:` |
+
+Versions run `vX.Y`. Every update bumps `Y` by one; when `Y` would reach 10 it rolls back to 0 and
+`X` goes up by one, so v1.9 is followed by v2.0.
 
 ---
 
@@ -36,11 +40,11 @@ Bedromatica_BP/                              Bedromatica_RP/
 ├── items/                                   │   └── schem_wand_charged.attachable.json
 │   ├── schem_wand.json                      ├── animations/schem_wand.animation.json
 │   └── schem_wand_charged.json              ├── particles/selection_line.particle.json
-└── texts/                                   ├── ui/
-    ├── en_US.lang                           │   ├── schem_table_screen.json
-    └── languages.json                       │   ├── bedromatica_server_form.json
-                                             │   └── _ui_defs.json
-                                             ├── texts/
+├── structures/mystructure/                  ├── ui/
+│   └── README.txt                           │   ├── schem_table_screen.json
+└── texts/                                   │   ├── bedromatica_server_form.json
+    ├── en_US.lang                           │   └── _ui_defs.json
+    └── languages.json                       ├── texts/
                                              └── sounds/   (empty)
 ```
 
@@ -119,15 +123,44 @@ The wand loses its glow and empties out, ready for the next region.
 
 **Reset at any time:** sneak + use the wand on any block → `Wand reset.`
 
-### Where the file lands
+### Where the .mcstructure file lands
 
-The structure is saved into the world exactly as `/structure save` writes it, under
-`mystructure:<your_name>`. That means:
+The structure is saved exactly as `/structure save` writes it, under `mystructure:<your_name>`.
+Every successful save prints the path in chat so you never have to hunt for it:
+
+```
+[Bedromatica] Saved mystructure:my_build
+  file: structures/mystructure/my_build.mcstructure
+```
+
+That path is relative to your **world folder**:
+
+| Platform | World folder |
+|---|---|
+| Windows (release) | `%LOCALAPPDATA%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\LocalState\games\com.mojang\minecraftWorlds\<world id>\` |
+| Windows (preview) | `%LOCALAPPDATA%\Packages\Microsoft.MinecraftWindowsBeta_8wekyb3d8bbwe\LocalState\games\com.mojang\minecraftWorlds\<world id>\` |
+| Android | `/storage/emulated/0/Android/data/com.mojang.minecraftpe/files/games/com.mojang/minecraftWorlds/<world id>/` |
+| iOS | `Minecraft/games/com.mojang/minecraftWorlds/<world id>/` (Files app) |
+| Dedicated server | `worlds/<level name>/` |
+
+Each `<world id>` folder has a `levelname.txt` naming the world, which is how you tell them apart.
+
+Open `structures/mystructure/` in there and the `.mcstructure` files are sitting in it, ready to
+copy.
+
+### Bundling a structure with the mod
+
+`Bedromatica_BP/structures/mystructure/` is the pack's own structure folder. Drop a saved
+`.mcstructure` in there and it ships with Bedromatica — the pack loads it as `mystructure:<name>`
+in every world the pack is applied to, without that world needing its own copy.
+
+Bedrock packs are read-only while the game is running, so nothing can write into that folder from
+in-game; the copy across is a manual step, which is why the addon prints the source path for you.
+
+### Loading a saved structure
 
 * **Structure block** — set one to Load and type `mystructure:my_build`.
-* **On disk** — `<world folder>/structures/mystructure/my_build.mcstructure`, which is the file you
-  hand to other tools or share.
-* **In game** — `/structure load mystructure:my_build ~ ~ ~`.
+* **Command** — `/structure load mystructure:my_build ~ ~ ~`.
 
 Names are folded to the alphabet structure identifiers accept: lowercase, spaces become `_`, and
 anything else is dropped. `My House!!` becomes `my_house`. Max 30 characters. Saving over an

@@ -65,6 +65,13 @@ export const STRUCTURE_NAMESPACE = "mystructure";
 /** Namespace used for the throwaway snapshot the wand carries around. */
 export const TEMP_STRUCTURE_NAMESPACE = "bedromatica";
 
+/**
+ * The pack's own structure folder, shown to the player after a save. Bedrock
+ * packs are read-only at runtime, so the engine writes the .mcstructure into
+ * the world folder; copying it here bundles it with the addon.
+ */
+export const STRUCTURE_FOLDER = "Bedromatica_BP/structures/mystructure";
+
 /* ------------------------------------------------------------------ *
  * Selection rendering
  * ------------------------------------------------------------------ */

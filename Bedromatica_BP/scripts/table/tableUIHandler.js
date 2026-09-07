@@ -34,7 +34,8 @@ import {
   BLOCK_TABLE,
   FORM_TITLE_INPUT,
   FORM_TITLE_RESULT,
-  MAX_NAME_LENGTH
+  MAX_NAME_LENGTH,
+  STRUCTURE_FOLDER
 } from "../utils/constants.js";
 import {
   getMainHand,
@@ -49,7 +50,8 @@ import {
   sanitizeName,
   finalizeCapture,
   discardStructure,
-  normalizeRegion
+  normalizeRegion,
+  structureFilePath
 } from "../wand/structureCapture.js";
 import { makeBlankWand, resetWand } from "../wand/wandHandler.js";
 import { forgetPlayer } from "../wand/selectionBox.js";
@@ -216,16 +218,28 @@ export async function handleConfirm(player, tableLocation, typedName) {
   forgetPlayer(player.id);
 
   const { size } = normalizeRegion(sel.pos1, sel.pos2);
+  const filePath = structureFilePath(parsed.name);
   const detail = [
     `§7Saved as §f${result.finalId}`,
     `§7Size §f${size.x} x ${size.y} x ${size.z}`,
     `§7Region §f${formatVec(sel.pos1)} §7to §f${formatVec(sel.pos2)}`,
     "",
-    "§8Load it from a structure block, or find it in the",
-    `§8world's structures folder as §7${parsed.name}.mcstructure§8.`
+    "§7File §f" + filePath,
+    "§8inside your world folder. Copy it into the pack's own",
+    `§8${STRUCTURE_FOLDER} folder to ship it with Bedromatica.`
   ];
 
   actionBar(player, `§aSuccessful §7- ${result.finalId}`);
+
+  // Also put the path in chat so it survives the screen closing.
+  try {
+    player.sendMessage(
+      `§7[§bBedromatica§7] §aSaved §f${result.finalId}\n§7  file: §f${filePath}`
+    );
+  } catch {
+    /* player disconnected */
+  }
+
   await showResult(player, "§aSuccessful", detail);
 }
 

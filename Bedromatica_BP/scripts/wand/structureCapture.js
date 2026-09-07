@@ -144,6 +144,17 @@ export function makeFinalId(name) {
   return `${STRUCTURE_NAMESPACE}:${name}`;
 }
 
+/**
+ * Where the saved region lands on disk, relative to the world folder.
+ * `StructureSaveMode.World` files are written to
+ * `structures/<namespace>/<name>.mcstructure`, the same layout the pack's own
+ * `structures/` folder uses, so a file can be copied straight from one to the
+ * other.
+ */
+export function structureFilePath(name) {
+  return `structures/${STRUCTURE_NAMESPACE}/${name}.mcstructure`;
+}
+
 /* ------------------------------------------------------------------ *
  * Capture
  * ------------------------------------------------------------------ */
