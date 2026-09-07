@@ -1,0 +1,23 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Bedromatica Resources",
+    "description": "A Bedrock port of the original Litematica from Java Edition.",
+    "uuid": "7ea1112a-243e-4b44-93fa-b88a766c358d",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 21, 80]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "description": "Models, textures, particles and the Schem Table screen.",
+      "uuid": "598813e8-af7f-4e81-ba29-49dc62b82c22",
+      "version": [1, 0, 0]
+    }
+  ],
+  "metadata": {
+    "authors": ["Usersainyy"],
+    "license": "MIT",
+    "product_type": "addon"
+  }
+}

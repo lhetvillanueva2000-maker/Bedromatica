@@ -1,0 +1,6 @@
+{
+  "ui_defs": [
+    "ui/schem_table_screen.json",
+    "ui/bedromatica_server_form.json"
+  ]
+}

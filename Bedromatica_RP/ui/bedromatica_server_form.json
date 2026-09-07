@@ -1,0 +1,36 @@
+{
+  "namespace": "server_form",
+
+  "_comment": "Patches the two vanilla server-form layouts instead of replacing them. Every control we add is gated on #title_text, so forms opened by vanilla or by any other add-on render exactly as before.",
+
+  "custom_form": {
+    "modifications": [
+      {
+        "array_name": "controls",
+        "operation": "insert_front",
+        "value": [
+          { "bedromatica_backdrop@bedromatica.schem_table_backdrop": {} }
+        ]
+      },
+      {
+        "array_name": "controls",
+        "operation": "insert_back",
+        "value": [
+          { "bedromatica_overlay@bedromatica.schem_table_overlay": {} }
+        ]
+      }
+    ]
+  },
+
+  "long_form": {
+    "modifications": [
+      {
+        "array_name": "controls",
+        "operation": "insert_front",
+        "value": [
+          { "bedromatica_result_backdrop@bedromatica.schem_result_backdrop": {} }
+        ]
+      }
+    ]
+  }
+}

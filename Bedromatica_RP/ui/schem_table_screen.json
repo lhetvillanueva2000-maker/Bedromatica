@@ -1,0 +1,127 @@
+{
+  "namespace": "bedromatica",
+
+  "_comment_layout": "All offsets/sizes below are percentages of the 1408x768 schem_table_ui.png artwork, so they land exactly on the painted slots, input bar and Confirm plate.",
+
+  "input_screen_binding": {
+    "bindings": [
+      {
+        "binding_name": "#title_text",
+        "binding_name_override": "#title_text"
+      },
+      {
+        "binding_type": "view",
+        "source_property_name": "(#title_text = 'Bedromatica Schem Table')",
+        "target_property_name": "#visible"
+      }
+    ]
+  },
+
+  "result_screen_binding": {
+    "bindings": [
+      {
+        "binding_name": "#title_text",
+        "binding_name_override": "#title_text"
+      },
+      {
+        "binding_type": "view",
+        "source_property_name": "(#title_text = 'Bedromatica Diagnostics')",
+        "target_property_name": "#visible"
+      }
+    ]
+  },
+
+  "artwork_frame": {
+    "type": "panel",
+    "size": ["100%", "54.5454%x"],
+    "max_size": ["183.3333%y", "100%"],
+    "anchor_from": "center",
+    "anchor_to": "center"
+  },
+
+  "artwork_image": {
+    "type": "image",
+    "texture": "textures/ui/schem_table_ui",
+    "size": ["100%", "100%"],
+    "anchor_from": "center",
+    "anchor_to": "center"
+  },
+
+  "schem_table_backdrop@bedromatica.input_screen_binding": {
+    "type": "panel",
+    "size": ["100%", "100%"],
+    "layer": 0,
+    "controls": [
+      {
+        "art@bedromatica.artwork_frame": {
+          "controls": [
+            { "bg@bedromatica.artwork_image": {} }
+          ]
+        }
+      }
+    ]
+  },
+
+  "schem_result_backdrop@bedromatica.result_screen_binding": {
+    "type": "panel",
+    "size": ["100%", "100%"],
+    "layer": 0,
+    "controls": [
+      {
+        "art@bedromatica.artwork_frame": {
+          "controls": [
+            { "bg@bedromatica.artwork_image": {} }
+          ]
+        }
+      }
+    ]
+  },
+
+  "core_unit_wand_icon": {
+    "type": "image",
+    "texture": "textures/items/schem_wand_icon",
+    "size": ["7.1%", "13.02%"],
+    "anchor_from": "center",
+    "anchor_to": "center",
+    "offset": ["-16.12%", "-3.39%"]
+  },
+
+  "output_port_wand_icon": {
+    "type": "image",
+    "texture": "textures/items/schem_wand_icon",
+    "size": ["7.1%", "13.02%"],
+    "alpha": 0.35,
+    "anchor_from": "center",
+    "anchor_to": "center",
+    "offset": ["13.35%", "-3.39%"]
+  },
+
+  "diagnostics_readout": {
+    "type": "label",
+    "text": "bedromatica.schem_table.readout",
+    "color": [0.42, 0.88, 0.92],
+    "shadow": true,
+    "size": ["45.45%", "5.73%"],
+    "text_alignment": "center",
+    "anchor_from": "center",
+    "anchor_to": "center",
+    "offset": ["0%", "-30.21%"]
+  },
+
+  "schem_table_overlay@bedromatica.input_screen_binding": {
+    "type": "panel",
+    "size": ["100%", "100%"],
+    "layer": 20,
+    "controls": [
+      {
+        "art@bedromatica.artwork_frame": {
+          "controls": [
+            { "core_slot@bedromatica.core_unit_wand_icon": {} },
+            { "output_slot@bedromatica.output_port_wand_icon": {} },
+            { "readout@bedromatica.diagnostics_readout": {} }
+          ]
+        }
+      }
+    ]
+  }
+}

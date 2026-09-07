@@ -1,0 +1,4 @@
+item.bedromatica:schem_wand.name=Schem Wand
+item.bedromatica:schem_wand_charged.name=Schem Wand
+tile.bedromatica:schem_table.name=Schem Table
+bedromatica.schem_table.readout=AWAITING DESIGNATION INPUT

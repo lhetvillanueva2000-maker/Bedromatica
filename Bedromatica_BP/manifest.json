@@ -1,0 +1,48 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Bedromatica",
+    "description": "A Bedrock port of the original Litematica from Java Edition.",
+    "uuid": "ea4f5cfd-276e-4b67-a659-1b75c3d65979",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 21, 80]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "description": "Schem Wand item and Schem Table block definitions.",
+      "uuid": "65a8b96d-e4ad-4df4-8e74-97623b53b78c",
+      "version": [1, 0, 0]
+    },
+    {
+      "type": "script",
+      "language": "javascript",
+      "description": "Selection, capture and Schem Table logic.",
+      "uuid": "f2ff45c5-ea18-40a0-8fa4-d1e2e7489d96",
+      "version": [1, 0, 0],
+      "entry": "scripts/main.js"
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "7ea1112a-243e-4b44-93fa-b88a766c358d",
+      "version": [1, 0, 0]
+    },
+    {
+      "module_name": "@minecraft/server",
+      "version": "1.19.0"
+    },
+    {
+      "module_name": "@minecraft/server-ui",
+      "version": "1.3.0"
+    }
+  ],
+  "metadata": {
+    "authors": ["Usersainyy"],
+    "license": "MIT",
+    "product_type": "addon",
+    "generated_with": {
+      "bedromatica": ["1.0.0"]
+    }
+  }
+}

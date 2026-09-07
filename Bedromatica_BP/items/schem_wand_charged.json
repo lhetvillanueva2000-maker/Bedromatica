@@ -1,0 +1,22 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:item": {
+    "description": {
+      "identifier": "bedromatica:schem_wand_charged"
+    },
+    "components": {
+      "minecraft:icon": "schem_wand",
+      "minecraft:display_name": {
+        "value": "Schem Wand"
+      },
+      "minecraft:max_stack_size": 1,
+      "minecraft:hand_equipped": true,
+      "minecraft:glint": true,
+      "minecraft:should_despawn": false,
+      "minecraft:damage": 0,
+      "minecraft:durability": {
+        "max_durability": 256
+      }
+    }
+  }
+}

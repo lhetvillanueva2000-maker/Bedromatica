@@ -1,0 +1,41 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:attachable": {
+    "description": {
+      "identifier": "bedromatica:schem_wand",
+      "materials": {
+        "default": "entity_alphatest",
+        "enchanted": "entity_alphatest_glint"
+      },
+      "textures": {
+        "default": "textures/items/schem_wand",
+        "enchanted": "textures/misc/enchanted_item_glint"
+      },
+      "geometry": {
+        "default": "geometry.schem_wand"
+      },
+      "scripts": {
+        "pre_animation": [
+          "variable.is_first_person = context.is_first_person;"
+        ],
+        "animate": [
+          "idle",
+          {
+            "wield_first_person": "context.is_first_person"
+          },
+          {
+            "wield_third_person": "!context.is_first_person"
+          }
+        ]
+      },
+      "animations": {
+        "idle": "animation.schem_wand.idle",
+        "wield_first_person": "animation.schem_wand.wield_first_person",
+        "wield_third_person": "animation.schem_wand.wield_third_person"
+      },
+      "render_controllers": [
+        "controller.render.item_default"
+      ]
+    }
+  }
+}
