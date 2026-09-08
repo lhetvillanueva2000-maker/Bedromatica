@@ -13,6 +13,7 @@ const SHELL = [
   ".",
   "index.html",
   "styles.css",
+  "fonts.css",
   "manifest.webmanifest",
   "js/app.js",
   "js/nbt.js",
@@ -22,7 +23,14 @@ const SHELL = [
   "icons/icon-192.png",
   "icons/icon-512.png",
   "vendor/three.min.js",
-  "vendor/jszip.min.js"
+  "vendor/jszip.min.js",
+  "fonts/chakra-petch-600.woff2",
+  "fonts/chakra-petch-700.woff2",
+  "fonts/ibm-plex-sans-400.woff2",
+  "fonts/ibm-plex-sans-500.woff2",
+  "fonts/ibm-plex-sans-600.woff2",
+  "fonts/ibm-plex-mono-400.woff2",
+  "fonts/ibm-plex-mono-500.woff2"
 ];
 
 self.addEventListener("install", (event) => {

@@ -1,0 +1,11 @@
+# Android build intermediates - regenerate with android/build.sh
+android/build/
+
+# Signing key. NEVER commit this: anyone holding it can publish updates that
+# Android will accept as genuine updates to this app.
+android/*.keystore
+android/*.jks
+*.idsig
+
+node_modules/
+.DS_Store

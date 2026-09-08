@@ -8,14 +8,10 @@ name: Deploy Schem Bench
 # Pages on for the first time is an owner-only API call that the workflow token
 # is not permitted to make. Pushing a gh-pages branch is something the token
 # CAN do, and GitHub serves that branch once Pages is pointed at it.
+#
+# HELD: manual trigger only. The web build is not being published yet - run
+# this workflow by hand from the Actions tab when it is time to go live.
 on:
-  push:
-    branches:
-      - claude/bedromatica-opus5-prompt-gl95i3
-      - main
-    paths:
-      - 'app/**'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:

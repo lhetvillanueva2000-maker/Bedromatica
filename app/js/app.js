@@ -89,7 +89,9 @@ function boot() {
 
   showPanel("structures");
 
-  if ("serviceWorker" in navigator) {
+  // The Android build already has every asset on disk, and a stale worker
+  // cache there would survive app updates. Only the web build needs this.
+  if ("serviceWorker" in navigator && !window.SchemBench) {
     navigator.serviceWorker.register("sw.js").catch(() => {
       /* offline support is a bonus, not a requirement */
     });
@@ -100,17 +102,31 @@ function boot() {
  * Loading
  * ------------------------------------------------------------------ */
 
+/**
+ * Every Minecraft world container - .mcworld, .mctemplate, .mcpack, .mcaddon -
+ * is a zip with a different extension on it. Sniffing the first four bytes
+ * instead of trusting the name means a renamed file, or one handed over by an
+ * Android picker that dropped the extension, still opens.
+ */
+async function looksLikeZip(file) {
+  const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  if (head[0] !== 0x50 || head[1] !== 0x4b) return false;
+  // Local header, empty archive, or spanned archive.
+  return (
+    (head[2] === 0x03 && head[3] === 0x04) ||
+    (head[2] === 0x05 && head[3] === 0x06) ||
+    (head[2] === 0x07 && head[3] === 0x08)
+  );
+}
+
 async function onFilePicked(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   ui.worldInput.value = "";
 
   try {
-    if (file.name.toLowerCase().endsWith(".mcstructure")) {
-      await loadSingle(file);
-    } else {
-      await loadArchive(file);
-    }
+    if (await looksLikeZip(file)) await loadArchive(file);
+    else await loadSingle(file);
   } catch (err) {
     toast(err.message ?? String(err), true);
   }
@@ -131,13 +147,38 @@ async function loadSingle(file) {
   selectStructure(0);
 }
 
+/** Containers that are themselves zips, and may sit inside another zip. */
+const NESTED_ARCHIVE = /\.(mcworld|mctemplate|mcpack|mcaddon|zip)$/i;
+
 async function loadArchive(file) {
   if (typeof JSZip === "undefined") {
     throw new Error("The archive reader did not load. Reload the page and try again.");
   }
   toast(`Reading ${file.name}…`);
+
   const zip = await JSZip.loadAsync(file);
   const found = await listStructures(zip);
+
+  // A plain .zip someone made by zipping their world folder - or by zipping the
+  // .mcworld itself - is common enough to be worth opening one level down.
+  const inner = [];
+  zip.forEach((path, entry) => {
+    if (!entry.dir && NESTED_ARCHIVE.test(path)) inner.push({ path, entry });
+  });
+
+  for (const nested of inner) {
+    try {
+      const sub = await JSZip.loadAsync(await nested.entry.async("arraybuffer"));
+      const subFound = await listStructures(sub);
+      const label = nested.path.split("/").pop().replace(NESTED_ARCHIVE, "");
+      for (const item of subFound) {
+        item.namespace = `${label} › ${item.namespace}`;
+        found.push(item);
+      }
+    } catch {
+      // Not a readable archive after all; the outer listing still stands.
+    }
+  }
 
   if (!found.length) {
     throw new Error(
@@ -145,7 +186,8 @@ async function loadArchive(file) {
     );
   }
 
-  state.sourceName = file.name.replace(/\.(mcworld|mcpack|mcaddon|zip)$/i, "");
+  found.sort((a, b) => a.name.localeCompare(b.name));
+  state.sourceName = file.name.replace(NESTED_ARCHIVE, "");
   state.entries = found;
   renderStructureList();
   toast(`Found ${found.length} structure${found.length === 1 ? "" : "s"}`);
@@ -382,7 +424,27 @@ function onExport() {
   );
 }
 
+/**
+ * Hands the file to whatever can actually save it.
+ *
+ * In the Android build a WebView cannot follow a blob: download, so the app
+ * exposes a bridge that writes the bytes into the device's Downloads folder.
+ * In a browser the anchor works normally. Same call site either way.
+ */
 function download(blob, filename) {
+  const bridge = window.SchemBench;
+  if (bridge && typeof bridge.saveFile === "function") {
+    blob
+      .arrayBuffer()
+      .then((buf) => {
+        const saved = bridge.saveFile(filename, base64FromBuffer(buf));
+        if (saved) toast(`Saved to Downloads: ${filename}`);
+        else toast("Android could not write the file.", true);
+      })
+      .catch((err) => toast(err.message ?? String(err), true));
+    return;
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -391,6 +453,17 @@ function download(blob, filename) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+/** Chunked so a large structure does not blow the argument limit on apply(). */
+function base64FromBuffer(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
 }
 
 function sanitize(name) {

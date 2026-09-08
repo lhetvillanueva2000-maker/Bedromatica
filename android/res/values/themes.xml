@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!--
+    Matches the app's own blueprint ground (#0A1420) so the launch window does
+    not flash white before the WebView paints.
+  -->
+  <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+    <item name="android:windowBackground">@color/ground</item>
+    <item name="android:statusBarColor">@color/ground</item>
+    <item name="android:navigationBarColor">@color/ground</item>
+    <item name="android:colorPrimary">@color/ground</item>
+    <item name="android:colorAccent">@color/cyan</item>
+  </style>
+</resources>
