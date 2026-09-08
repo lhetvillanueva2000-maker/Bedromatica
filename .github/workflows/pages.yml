@@ -1,7 +1,13 @@
 name: Deploy Schem Bench
 
-# Publishes app/ to GitHub Pages. The tool is a static page - it reads .mcworld
-# files in the browser and never uploads anything - so there is nothing to build.
+# Publishes app/ to the gh-pages branch. The tool is a static page - it reads
+# .mcworld files in the browser and never uploads anything - so there is
+# nothing to build, just content to copy across.
+#
+# This uses the branch source rather than actions/deploy-pages because turning
+# Pages on for the first time is an owner-only API call that the workflow token
+# is not permitted to make. Pushing a gh-pages branch is something the token
+# CAN do, and GitHub serves that branch once Pages is pointed at it.
 on:
   push:
     branches:
@@ -13,34 +19,41 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# One deploy at a time; let a running one finish rather than cancelling it.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Turn Pages on if it is not already
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      - name: Push app/ to gh-pages
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd app
 
-      - name: Upload the app
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: app
+          # Tell Pages to serve the files as-is instead of running Jekyll over them.
+          touch .nojekyll
 
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy Schem Bench from ${GITHUB_SHA}"
+          git push -q --force \
+            "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            gh-pages
+
+          echo "Published $(git ls-files | wc -l) files to gh-pages."
+
+      - name: Where it will appear
+        run: |
+          owner="${GITHUB_REPOSITORY%%/*}"
+          name="${GITHUB_REPOSITORY##*/}"
+          echo "::notice title=Schem Bench::https://${owner,,}.github.io/${name}/"
