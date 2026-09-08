@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Schem Bench</title>
+<meta name="description" content="Pull individual builds out of a Minecraft Bedrock world export, strip the terrain, and save clean .mcstructure files.">
+<meta name="theme-color" content="#0A1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Schem Bench">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="mark">
+    <svg viewBox="0 0 24 24" aria-hidden="true" class="mark-glyph">
+      <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M4 8.5 12 13l8-4.5M12 13v7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round" opacity="0.65"/>
+    </svg>
+    <div class="mark-text">
+      <strong>Schem Bench</strong>
+      <span>Bedrock structure extractor</span>
+    </div>
+  </div>
+  <label class="btn btn-primary" for="worldInput">
+    <input id="worldInput" type="file" accept=".mcworld,.mcpack,.mcaddon,.zip,.mcstructure" hidden>
+    Open world
+  </label>
+</header>
+
+<main id="app" class="layout">
+
+  <!-- ---------- structures ---------- -->
+  <section class="rail" id="railStructures" data-panel="structures">
+    <div class="rail-head">
+      <h2>Structures</h2>
+      <span class="tally" id="structureTally">none loaded</span>
+    </div>
+    <div class="rail-body" id="structureList">
+      <div class="empty" id="emptyState">
+        <div class="empty-art" aria-hidden="true">
+          <svg viewBox="0 0 64 64">
+            <path d="M8 20 32 8l24 12v24L32 56 8 44z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M8 20l24 12 24-12M32 32v24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.5"/>
+          </svg>
+        </div>
+        <h3>Open a world export</h3>
+        <p>In Minecraft: <b>Settings &rsaquo; Storage</b>, find your world, tap the export icon. Then open the <code>.mcworld</code> here.</p>
+        <p class="fine">A single <code>.mcstructure</code> file works too. Nothing leaves your device &mdash; the whole thing runs offline.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------- hologram ---------- -->
+  <section class="stage" data-panel="view">
+    <canvas id="stage"></canvas>
+    <div class="stage-empty" id="stageEmpty">
+      <span>No structure selected</span>
+    </div>
+    <div class="stage-hud" id="stageHud" hidden>
+      <div class="hud-line" id="hudName">&mdash;</div>
+      <div class="hud-stats">
+        <span id="hudSize" class="chip">&mdash;</span>
+        <span id="hudKept" class="chip chip-keep">&mdash;</span>
+        <span id="hudCut" class="chip chip-cut">&mdash;</span>
+      </div>
+    </div>
+    <div class="stage-tools" id="stageTools" hidden>
+      <button class="tool" id="toggleGhosts" aria-pressed="true">Ghosts</button>
+      <button class="tool" id="recenter">Recenter</button>
+    </div>
+  </section>
+
+  <!-- ---------- blocks + export ---------- -->
+  <section class="rail rail-right" id="railBlocks" data-panel="blocks">
+    <div class="rail-head">
+      <h2>Blocks</h2>
+      <span class="tally" id="blockTally">&mdash;</span>
+    </div>
+
+    <div class="quick" id="quickActions" hidden>
+      <button class="pill" data-quick="clutter">Cut ground</button>
+      <button class="pill" data-quick="rock">Cut rock too</button>
+      <button class="pill" data-quick="none">Keep all</button>
+      <button class="pill" data-quick="invert">Invert</button>
+    </div>
+
+    <div class="rail-body" id="blockList">
+      <p class="hint">Load a world to see what a structure is made of.</p>
+    </div>
+
+    <div class="export" id="exportPanel" hidden>
+      <div class="opts">
+        <label class="opt">
+          <input type="checkbox" id="optCrop" checked>
+          <span><b>Trim to the build</b><em>Shrink the box to what is left</em></span>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="optEntities">
+          <span><b>Keep entities</b><em>Mobs, item frames, armour stands</em></span>
+        </label>
+      </div>
+      <div class="result" id="exportResult" hidden></div>
+      <button class="btn btn-primary btn-wide" id="exportBtn">Save structure</button>
+      <p class="fine" id="exportNote">Stripped blocks become structure void, so pasting will not carve a hole in your world.</p>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" id="tabs">
+  <button class="tab is-on" data-tab="structures">Structures</button>
+  <button class="tab" data-tab="view">View</button>
+  <button class="tab" data-tab="blocks">Blocks</button>
+</nav>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

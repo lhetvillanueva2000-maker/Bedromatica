@@ -1,0 +1,46 @@
+name: Deploy Schem Bench
+
+# Publishes app/ to GitHub Pages. The tool is a static page - it reads .mcworld
+# files in the browser and never uploads anything - so there is nothing to build.
+on:
+  push:
+    branches:
+      - claude/bedromatica-opus5-prompt-gl95i3
+      - main
+    paths:
+      - 'app/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let a running one finish rather than cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Turn Pages on if it is not already
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload the app
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

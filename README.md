@@ -16,6 +16,27 @@ more changes to make it work — now you can use it just like the original versi
 Versions run `vX.Y`. Every update bumps `Y` by one; when `Y` would reach 10 it rolls back to 0 and
 `X` goes up by one, so v1.9 is followed by v2.0.
 
+## Schem Bench — the companion app
+
+**[lhetvillanueva2000-maker.github.io/Bedromatica](https://lhetvillanueva2000-maker.github.io/Bedromatica/)**
+
+Getting a `.mcstructure` off a phone normally means exporting the whole world and digging through
+it. Schem Bench does that part for you: open the `.mcworld`, pick the build you want, tick off the
+grass and dirt around it, save just that structure.
+
+- **Pick one build, not the whole world.** Every structure in the export is listed; you choose.
+- **Cut the clutter.** Ground, plants and water come pre-ticked for removal. Rock does not — stone
+  and deepslate are building materials far too often to delete for you, so they are one tap away
+  instead of a nasty surprise.
+- **See it first.** A 3D hologram shows the build with the removed blocks as translucent ghosts, so
+  you watch the structure separate from the ground before committing.
+- **Trim to fit.** The box shrinks to the build. Air inside stays air, so rooms stay hollow and
+  redstone gaps stay gaps. Stripped blocks become *structure void*, so pasting never punches a
+  hole in your world.
+- **Installs like an app.** Add it to your home screen: fullscreen, own icon, works offline.
+
+Everything runs in the browser — no upload, no account, no server. Source in [`app/`](app).
+
 ## Download
 
 | File | Use it for |
