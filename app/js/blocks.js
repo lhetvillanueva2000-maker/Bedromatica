@@ -106,6 +106,33 @@ export function isTerrainOfAnyKind(name) {
   return false;
 }
 
+/* The three families, individually, so the assistant can mix and match: a
+ * guardian farm needs its water, a tree farm needs its leaves. */
+
+export function isGround(name) {
+  const s = shortName(name);
+  return GROUND.has(s) || s.endsWith("_ore");
+}
+
+export function isRock(name) {
+  const s = shortName(name);
+  if (ROCK.has(s)) return true;
+  for (const suffix of TERRAIN_SUFFIXES) if (s.endsWith(suffix)) return true;
+  return false;
+}
+
+/** True for anything not in the vanilla namespace - i.e. added by a mod. */
+export function isModded(name) {
+  const i = name.indexOf(":");
+  if (i === -1) return false;
+  return name.slice(0, i) !== "minecraft";
+}
+
+export function namespaceOf(name) {
+  const i = name.indexOf(":");
+  return i === -1 ? "minecraft" : name.slice(0, i);
+}
+
 /* ------------------------------------------------------------------ *
  * Colour
  * ------------------------------------------------------------------ */

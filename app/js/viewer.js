@@ -1,53 +1,89 @@
 /**
  * Voxel hologram.
  *
- * Two instanced meshes: solid for blocks you are keeping, translucent for
- * blocks marked as clutter. Keeping the removed blocks on screen as ghosts is
- * the point of the view - you can see the build separating from the ground it
- * was cut out of, and catch the case where a filter is about to eat a wall.
+ * Renders every loaded structure at once, each placed at its real
+ * structure_world_origin, so the view is the whole set of builds sitting where
+ * they actually were rather than one structure floating alone.
+ *
+ * Three instanced meshes carry the blocks: solid for what you are keeping,
+ * translucent for what the filter will cut, and an additive overlay for
+ * anything a lever is currently powering. Entities are drawn separately with
+ * their own silhouettes.
  *
  * Camera controls are hand-written rather than pulled from three's examples,
  * because those ship as ES modules that do not pair with the UMD build, and
- * because touch needs different handling than a desktop-first control does.
+ * because a phone needs tap, long-press and pinch to mean three different
+ * things on the same surface.
  */
 
 import { blockColor, isThin } from "./blocks.js";
+import { blockDetailTexture, ghostTexture } from "./textures.js";
 
-const UP = 0.999;
+const TAP_MS = 260;
+const HOLD_MS = 420;
+const TAP_SLOP = 10;
 
 export class Hologram {
-  constructor(canvas) {
+  constructor(canvas, handlers = {}) {
     this.canvas = canvas;
+    this.handlers = handlers;
+
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
       alpha: true,
-      powerPreference: "high-performance"
+      powerPreference: "high-performance",
+      // A world-scale scene spans thousands of blocks while individual faces
+      // are one block apart. A linear depth buffer cannot hold both without
+      // coplanar faces tearing into each other.
+      logarithmicDepthBuffer: true
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.sortObjects = true;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 4000);
+    // Near plane well off zero: pushing it out is the single biggest win
+    // against z-fighting, log buffer or not.
+    this.camera = new THREE.PerspectiveCamera(45, 1, 0.5, 20000);
 
     this.target = new THREE.Vector3();
     this.spherical = { radius: 40, theta: Math.PI * 0.25, phi: Math.PI * 0.32 };
 
-    this.scene.add(new THREE.AmbientLight(0xbcd6f0, 0.72));
-    const key = new THREE.DirectionalLight(0xffffff, 0.85);
+    this.scene.add(new THREE.AmbientLight(0xbcd6f0, 0.66));
+    const key = new THREE.DirectionalLight(0xffffff, 0.9);
     key.position.set(0.6, 1, 0.45);
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x6ce0ec, 0.35);
+    const rim = new THREE.DirectionalLight(0x6ce0ec, 0.32);
     rim.position.set(-0.7, 0.35, -0.6);
     this.scene.add(rim);
+
+    this.detail = blockDetailTexture();
+    this.ghostMap = ghostTexture();
 
     this.group = new THREE.Group();
     this.scene.add(this.group);
 
-    this.grid = null;
     this.solid = null;
     this.ghost = null;
+    this.power = null;
+    this.entityGroup = null;
+    this.grid = null;
+
+    /** Parallel to the solid mesh's instance ids, for picking. */
+    this.solidCells = [];
+    this.allCells = [];
+
     this.fitSize = null;
     this.userAdjusted = false;
+
+    this.raycaster = new THREE.Raycaster();
+    this.pointer = new THREE.Vector2();
+
+    this.selection = null;   // {min:{x,y,z}, max:{x,y,z}} in world cells
+    this.selectionMesh = null;
+    this.hoverMesh = null;
+
+    this.mode = "orbit";
 
     this.bindControls();
     this.resize();
@@ -62,11 +98,14 @@ export class Hologram {
    * ---------------------------------------------------------------- */
 
   /**
-   * @param {Array<{x,y,z,name,kept}>} cells
-   * @param {[number,number,number]} size
+   * @param {Array} cells world-positioned cells: {x,y,z,name,kept,structureIndex}
+   * @param {{min:number[], max:number[]}} bounds overall world bounds
+   * @param {Array} entities world-positioned entities
    */
-  setCells(cells, size) {
+  setCells(cells, bounds, entities = []) {
     this.clear();
+    this.allCells = cells;
+
     if (!cells.length) {
       this.needsRender = true;
       return;
@@ -75,124 +114,302 @@ export class Hologram {
     const kept = cells.filter((c) => c.kept);
     const dropped = cells.filter((c) => !c.kept);
 
-    this.solid = this.buildMesh(kept, false);
-    this.ghost = this.buildMesh(dropped, true);
+    this.solidCells = kept;
+    this.solid = this.buildBlockMesh(kept, false);
+    this.ghost = this.buildBlockMesh(dropped, true);
     if (this.solid) this.group.add(this.solid);
     if (this.ghost) this.group.add(this.ghost);
 
-    const [sx, sy, sz] = size;
-    this.group.position.set(-sx / 2, -sy / 2, -sz / 2);
+    if (entities.length) {
+      this.entityGroup = this.buildEntities(entities);
+      this.group.add(this.entityGroup);
+    }
+
+    const span = [
+      bounds.max[0] - bounds.min[0] + 1,
+      bounds.max[1] - bounds.min[1] + 1,
+      bounds.max[2] - bounds.min[2] + 1
+    ];
+    this.centre = new THREE.Vector3(
+      bounds.min[0] + span[0] / 2,
+      bounds.min[1] + span[1] / 2,
+      bounds.min[2] + span[2] / 2
+    );
 
     this.grid = new THREE.GridHelper(
-      Math.max(sx, sz) * 1.6,
-      Math.max(2, Math.round(Math.max(sx, sz) / 2)),
+      Math.max(span[0], span[2]) * 1.5,
+      Math.max(2, Math.min(60, Math.round(Math.max(span[0], span[2]) / 4))),
       0x2c8aa4,
       0x1d375e
     );
-    this.grid.position.y = -sy / 2 - 0.02;
+    this.grid.position.set(this.centre.x, bounds.min[1] - 0.02, this.centre.z);
+    this.grid.material.depthWrite = false;
     this.scene.add(this.grid);
 
-    this.frame(size);
+    this.frame(span);
     this.needsRender = true;
   }
 
-  buildMesh(cells, isGhost) {
+  buildBlockMesh(cells, isGhost) {
     if (!cells.length) return null;
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-
-    // Per-instance colour needs BOTH halves of the shader path: `vertexColors`
-    // turns on USE_COLOR, which multiplies by the geometry's `color` attribute.
-    // BoxGeometry has no such attribute, so without this white one every
-    // instance multiplies down to black.
-    if (!isGhost) {
-      const white = new Float32Array(geometry.attributes.position.count * 3).fill(1);
-      geometry.setAttribute("color", new THREE.BufferAttribute(white, 3));
-    }
+    // Per-instance colour needs USE_COLOR on, which multiplies by the
+    // geometry's own colour attribute - BoxGeometry has none, so without this
+    // white one every instance multiplies down to black.
+    const white = new Float32Array(geometry.attributes.position.count * 3).fill(1);
+    geometry.setAttribute("color", new THREE.BufferAttribute(white, 3));
 
     const material = new THREE.MeshLambertMaterial(
       isGhost
         ? {
+            map: this.ghostMap,
             color: 0x8fb8d8,
             transparent: true,
-            opacity: 0.16,
-            depthWrite: false
+            opacity: 0.14,
+            depthWrite: false,
+            // Ghosts sit in the same cells as the terrain they replace; the
+            // offset keeps their faces off the solids' faces.
+            polygonOffset: true,
+            polygonOffsetFactor: 2,
+            polygonOffsetUnits: 2
           }
-        : { vertexColors: true }
+        : {
+            map: this.detail,
+            vertexColors: true,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1
+          }
     );
 
     const mesh = new THREE.InstancedMesh(geometry, material, cells.length);
     const matrix = new THREE.Matrix4();
-    const color = new THREE.Color();
+    const colour = new THREE.Color();
     const scale = new THREE.Vector3();
     const position = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
+    const quat = new THREE.Quaternion();
 
     for (let i = 0; i < cells.length; i++) {
       const cell = cells[i];
       const thin = isThin(cell.name);
-      scale.set(1, thin ? 0.14 : 1, 1);
+      // Thin blocks are inset rather than merely flattened, so their top face
+      // never lands exactly on the face of the block underneath.
+      scale.set(thin ? 0.96 : 1, thin ? 0.12 : 1, thin ? 0.96 : 1);
       position.set(
         cell.x + 0.5,
-        cell.y + (thin ? 0.07 : 0.5),
+        cell.y + (thin ? 0.062 : 0.5),
         cell.z + 0.5
       );
-      matrix.compose(position, quaternion, scale);
+      matrix.compose(position, quat, scale);
       mesh.setMatrixAt(i, matrix);
       if (!isGhost) {
-        color.setHex(blockColor(cell.name));
-        mesh.setColorAt(i, color);
+        colour.setHex(blockColor(cell.name));
+        mesh.setColorAt(i, colour);
       }
     }
 
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.renderOrder = isGhost ? 1 : 0;
+    mesh.renderOrder = isGhost ? 2 : 0;
+    mesh.frustumCulled = false;
     return mesh;
   }
 
+  /** Item frames, armour stands, paintings - never mobs. */
+  buildEntities(entities) {
+    const group = new THREE.Group();
+    const shapes = {
+      panel: new THREE.BoxGeometry(0.9, 0.9, 0.08),
+      post: new THREE.BoxGeometry(0.22, 1.7, 0.22),
+      cart: new THREE.BoxGeometry(0.86, 0.5, 0.86),
+      cube: new THREE.BoxGeometry(0.6, 0.6, 0.6)
+    };
+
+    const byShape = new Map();
+    for (const e of entities) {
+      const shape = shapes[e.shape] ? e.shape : "cube";
+      if (!byShape.has(shape)) byShape.set(shape, []);
+      byShape.get(shape).push(e);
+    }
+
+    const matrix = new THREE.Matrix4();
+    const colour = new THREE.Color();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3(1, 1, 1);
+    const quat = new THREE.Quaternion();
+    const axis = new THREE.Vector3(0, 1, 0);
+
+    for (const [shape, list] of byShape) {
+      const geometry = shapes[shape];
+      const white = new Float32Array(geometry.attributes.position.count * 3).fill(1);
+      geometry.setAttribute("color", new THREE.BufferAttribute(white, 3));
+
+      const material = new THREE.MeshLambertMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.92,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1
+      });
+
+      const mesh = new THREE.InstancedMesh(geometry, material, list.length);
+      for (let i = 0; i < list.length; i++) {
+        const e = list[i];
+        position.set(e.x, e.y + (shape === "post" ? 0.85 : 0.5), e.z);
+        quat.setFromAxisAngle(axis, (-(e.yaw ?? 0) * Math.PI) / 180);
+        matrix.compose(position, quat, scale);
+        mesh.setMatrixAt(i, matrix);
+        colour.setHex(e.color);
+        mesh.setColorAt(i, colour);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      mesh.renderOrder = 1;
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
+
+    return group;
+  }
+
+  /** Additive glow over whatever the levers are currently powering. */
+  setPowered(poweredKeys) {
+    if (this.power) {
+      this.group.remove(this.power);
+      this.power.geometry.dispose();
+      this.power.material.dispose();
+      this.power = null;
+    }
+
+    const lit = this.allCells.filter(
+      (c) => c.kept && poweredKeys.has(`${c.lx},${c.ly},${c.lz}`)
+    );
+    if (!lit.length) {
+      this.needsRender = true;
+      return 0;
+    }
+
+    const geometry = new THREE.BoxGeometry(1.06, 1.06, 1.06);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xff4d3a,
+      transparent: true,
+      opacity: 0.42,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const mesh = new THREE.InstancedMesh(geometry, material, lit.length);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3(1, 1, 1);
+    const quat = new THREE.Quaternion();
+
+    for (let i = 0; i < lit.length; i++) {
+      position.set(lit[i].x + 0.5, lit[i].y + 0.5, lit[i].z + 0.5);
+      matrix.compose(position, quat, scale);
+      mesh.setMatrixAt(i, matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.renderOrder = 3;
+    mesh.frustumCulled = false;
+
+    this.power = mesh;
+    this.group.add(mesh);
+    this.needsRender = true;
+    return lit.length;
+  }
+
   clear() {
-    for (const mesh of [this.solid, this.ghost]) {
+    for (const mesh of [this.solid, this.ghost, this.power]) {
       if (!mesh) continue;
       this.group.remove(mesh);
       mesh.geometry.dispose();
       mesh.material.dispose();
     }
-    this.solid = null;
-    this.ghost = null;
+    this.solid = this.ghost = this.power = null;
+    this.solidCells = [];
+
+    if (this.entityGroup) {
+      for (const child of this.entityGroup.children) {
+        child.geometry.dispose();
+        child.material.dispose();
+      }
+      this.group.remove(this.entityGroup);
+      this.entityGroup = null;
+    }
     if (this.grid) {
       this.scene.remove(this.grid);
       this.grid.geometry.dispose();
       this.grid.material.dispose();
       this.grid = null;
     }
+    this.clearSelection();
   }
 
-  /**
-   * Pulls the camera back far enough to hold the whole structure.
-   *
-   * Fits the bounding sphere against BOTH axes: on a phone held upright the
-   * horizontal field of view is much narrower than the vertical one, so fitting
-   * only to the vertical FOV puts the camera inside a wide build.
-   */
-  frame(size) {
-    this.fitSize = size;
-    this.userAdjusted = false;
+  /* ---------------------------------------------------------------- *
+   * Selection
+   * ---------------------------------------------------------------- */
 
-    const [sx, sy, sz] = size;
-    const radius = 0.5 * Math.hypot(sx, sy, sz);
-    const fov = (this.camera.fov * Math.PI) / 180;
-    const aspect = this.camera.aspect || 1;
+  /** @returns {object|null} the cell under the given screen point */
+  pick(clientX, clientY) {
+    if (!this.solid) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    this.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointer, this.camera);
 
-    const distV = radius / Math.sin(fov / 2);
-    const hFov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
-    const distH = radius / Math.sin(hFov / 2);
+    const hits = this.raycaster.intersectObject(this.solid, false);
+    if (!hits.length) return null;
+    const id = hits[0].instanceId;
+    return id === undefined ? null : this.solidCells[id] ?? null;
+  }
 
-    this.target.set(0, 0, 0);
-    this.spherical.radius = Math.max(distV, distH) * 1.18;
-    this.spherical.theta = Math.PI * 0.25;
-    this.spherical.phi = Math.PI * 0.32;
-    this.applyCamera();
+  setSelection(min, max) {
+    this.selection = { min, max };
+    this.drawSelection();
+    this.handlers.onSelection?.(this.selection);
+  }
+
+  clearSelection() {
+    this.selection = null;
+    if (this.selectionMesh) {
+      this.scene.remove(this.selectionMesh);
+      this.selectionMesh.geometry.dispose();
+      this.selectionMesh.material.dispose();
+      this.selectionMesh = null;
+    }
+    this.needsRender = true;
+  }
+
+  drawSelection() {
+    if (this.selectionMesh) {
+      this.scene.remove(this.selectionMesh);
+      this.selectionMesh.geometry.dispose();
+      this.selectionMesh.material.dispose();
+      this.selectionMesh = null;
+    }
+    if (!this.selection) return;
+
+    const { min, max } = this.selection;
+    const sx = max.x - min.x + 1;
+    const sy = max.y - min.y + 1;
+    const sz = max.z - min.z + 1;
+
+    const box = new THREE.BoxGeometry(sx, sy, sz);
+    const edges = new THREE.EdgesGeometry(box);
+    const line = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({ color: 0x6ce0ec, depthTest: false })
+    );
+    line.position.set(min.x + sx / 2, min.y + sy / 2, min.z + sz / 2);
+    line.renderOrder = 10;
+    box.dispose();
+
+    this.selectionMesh = line;
+    this.scene.add(line);
+    this.needsRender = true;
   }
 
   /* ---------------------------------------------------------------- *
@@ -201,36 +418,111 @@ export class Hologram {
 
   bindControls() {
     const el = this.canvas;
-    let mode = null;
+
+    let gesture = null;      // "orbit" | "pan" | "pinch" | "region"
+    let start = null;
     let last = null;
     let lastPinch = 0;
+    let downAt = 0;
+    let holdTimer = null;
+    let anchorCell = null;
+    let moved = 0;
 
-    const pointFrom = (e) => ({ x: e.clientX, y: e.clientY });
-    const touchMid = (t) => ({
+    const point = (e) => ({ x: e.clientX, y: e.clientY });
+    const mid = (t) => ({
       x: (t[0].clientX + t[1].clientX) / 2,
       y: (t[0].clientY + t[1].clientY) / 2
     });
-    const touchGap = (t) =>
+    const gap = (t) =>
       Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 
+    const beginHold = (p) => {
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        // Long press: anchor a region at whatever is under the finger and let
+        // the drag that follows stretch it, rather than orbiting.
+        const cell = this.pick(p.x, p.y);
+        if (!cell) return;
+        anchorCell = cell;
+        gesture = "region";
+        this.setSelection(
+          { x: cell.x, y: cell.y, z: cell.z },
+          { x: cell.x, y: cell.y, z: cell.z }
+        );
+        this.handlers.onRegionStart?.(cell);
+      }, HOLD_MS);
+    };
+
+    const extendRegion = (p) => {
+      const cell = this.pick(p.x, p.y);
+      if (!cell || !anchorCell) return;
+      this.setSelection(
+        {
+          x: Math.min(anchorCell.x, cell.x),
+          y: Math.min(anchorCell.y, cell.y),
+          z: Math.min(anchorCell.z, cell.z)
+        },
+        {
+          x: Math.max(anchorCell.x, cell.x),
+          y: Math.max(anchorCell.y, cell.y),
+          z: Math.max(anchorCell.z, cell.z)
+        }
+      );
+    };
+
+    const finish = (p) => {
+      clearTimeout(holdTimer);
+      const heldFor = performance.now() - downAt;
+
+      if (gesture === "region") {
+        this.handlers.onRegionEnd?.(this.selection);
+      } else if (heldFor < TAP_MS && moved < TAP_SLOP && p) {
+        const cell = this.pick(p.x, p.y);
+        if (cell) {
+          this.setSelection(
+            { x: cell.x, y: cell.y, z: cell.z },
+            { x: cell.x, y: cell.y, z: cell.z }
+          );
+          this.handlers.onTap?.(cell);
+        } else {
+          this.clearSelection();
+          this.handlers.onTap?.(null);
+        }
+      }
+
+      gesture = null;
+      start = last = null;
+      anchorCell = null;
+      lastPinch = 0;
+      moved = 0;
+    };
+
+    /* ---- mouse / stylus ---- */
+
     el.addEventListener("pointerdown", (e) => {
-      if (e.pointerType === "touch") return; // touch handled below
+      if (e.pointerType === "touch") return;
       el.setPointerCapture(e.pointerId);
-      mode = e.button === 2 || e.shiftKey ? "pan" : "orbit";
-      last = pointFrom(e);
+      start = last = point(e);
+      downAt = performance.now();
+      moved = 0;
+      gesture = e.button === 2 || e.shiftKey ? "pan" : "orbit";
+      if (gesture === "orbit") beginHold(start);
     });
 
     el.addEventListener("pointermove", (e) => {
-      if (!mode || !last || e.pointerType === "touch") return;
-      const now = pointFrom(e);
-      this.drag(mode, now.x - last.x, now.y - last.y);
+      if (e.pointerType === "touch" || !last) return;
+      const now = point(e);
+      moved += Math.abs(now.x - last.x) + Math.abs(now.y - last.y);
+      if (moved > TAP_SLOP) clearTimeout(holdTimer);
+
+      if (gesture === "region") extendRegion(now);
+      else this.drag(gesture, now.x - last.x, now.y - last.y);
       last = now;
     });
 
     const endPointer = (e) => {
       if (e.pointerType === "touch") return;
-      mode = null;
-      last = null;
+      finish(last ?? start);
     };
     el.addEventListener("pointerup", endPointer);
     el.addEventListener("pointercancel", endPointer);
@@ -245,17 +537,23 @@ export class Hologram {
       { passive: false }
     );
 
+    /* ---- touch ---- */
+
     el.addEventListener(
       "touchstart",
       (e) => {
         e.preventDefault();
         if (e.touches.length === 1) {
-          mode = "orbit";
-          last = pointFrom(e.touches[0]);
+          start = last = point(e.touches[0]);
+          downAt = performance.now();
+          moved = 0;
+          gesture = "orbit";
+          beginHold(start);
         } else if (e.touches.length === 2) {
-          mode = "pinch";
-          last = touchMid(e.touches);
-          lastPinch = touchGap(e.touches);
+          clearTimeout(holdTimer);
+          gesture = "pinch";
+          last = mid(e.touches);
+          lastPinch = gap(e.touches);
         }
       },
       { passive: false }
@@ -265,18 +563,26 @@ export class Hologram {
       "touchmove",
       (e) => {
         e.preventDefault();
-        if (mode === "orbit" && e.touches.length === 1) {
-          const now = pointFrom(e.touches[0]);
+        if (!last) return;
+
+        if (gesture === "region" && e.touches.length === 1) {
+          extendRegion(point(e.touches[0]));
+          return;
+        }
+
+        if (e.touches.length === 1 && gesture === "orbit") {
+          const now = point(e.touches[0]);
+          moved += Math.abs(now.x - last.x) + Math.abs(now.y - last.y);
+          if (moved > TAP_SLOP) clearTimeout(holdTimer);
           this.drag("orbit", now.x - last.x, now.y - last.y);
           last = now;
-        } else if (mode === "pinch" && e.touches.length === 2) {
-          const gap = touchGap(e.touches);
-          if (lastPinch > 0) this.zoom(lastPinch / gap);
-          lastPinch = gap;
-
-          const mid = touchMid(e.touches);
-          this.drag("pan", mid.x - last.x, mid.y - last.y);
-          last = mid;
+        } else if (e.touches.length === 2 && gesture === "pinch") {
+          const g = gap(e.touches);
+          if (lastPinch > 0) this.zoom(lastPinch / g);
+          lastPinch = g;
+          const m = mid(e.touches);
+          this.drag("pan", m.x - last.x, m.y - last.y);
+          last = m;
         }
       },
       { passive: false }
@@ -284,9 +590,7 @@ export class Hologram {
 
     const endTouch = (e) => {
       e.preventDefault();
-      mode = null;
-      last = null;
-      lastPinch = 0;
+      finish(last);
     };
     el.addEventListener("touchend", endTouch, { passive: false });
     el.addEventListener("touchcancel", endTouch, { passive: false });
@@ -294,23 +598,23 @@ export class Hologram {
 
   drag(mode, dx, dy) {
     this.userAdjusted = true;
-    if (mode === "orbit") {
-      this.spherical.theta -= dx * 0.006;
-      this.spherical.phi = clamp(this.spherical.phi - dy * 0.006, 0.02, Math.PI - 0.02);
-    } else {
+    if (mode === "pan") {
       const scale = this.spherical.radius * 0.0016;
       const right = new THREE.Vector3();
       const up = new THREE.Vector3();
       this.camera.matrixWorld.extractBasis(right, up, new THREE.Vector3());
       this.target.addScaledVector(right, -dx * scale);
       this.target.addScaledVector(up, dy * scale);
+    } else {
+      this.spherical.theta -= dx * 0.006;
+      this.spherical.phi = clamp(this.spherical.phi - dy * 0.006, 0.02, Math.PI - 0.02);
     }
     this.applyCamera();
   }
 
   zoom(factor) {
     this.userAdjusted = true;
-    this.spherical.radius = clamp(this.spherical.radius * factor, 2, 3000);
+    this.spherical.radius = clamp(this.spherical.radius * factor, 2, 12000);
     this.applyCamera();
   }
 
@@ -322,9 +626,37 @@ export class Hologram {
       this.target.y + radius * Math.cos(phi),
       this.target.z + radius * sinPhi * Math.cos(theta)
     );
-    this.camera.up.set(0, UP, 0);
+    this.camera.up.set(0, 1, 0);
     this.camera.lookAt(this.target);
     this.needsRender = true;
+  }
+
+  /**
+   * Fits the bounding sphere against BOTH axes: on a phone held upright the
+   * horizontal field of view is much narrower than the vertical one, so
+   * fitting only vertically puts the camera inside a wide build.
+   */
+  frame(span) {
+    this.fitSize = span;
+    this.userAdjusted = false;
+
+    const radius = 0.5 * Math.hypot(span[0], span[1], span[2]);
+    const fov = (this.camera.fov * Math.PI) / 180;
+    const aspect = this.camera.aspect || 1;
+
+    const distV = radius / Math.sin(fov / 2);
+    const hFov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+    const distH = radius / Math.sin(hFov / 2);
+
+    if (this.centre) this.target.copy(this.centre);
+    this.spherical.radius = Math.max(distV, distH) * 1.2;
+    this.spherical.theta = Math.PI * 0.25;
+    this.spherical.phi = Math.PI * 0.32;
+    this.applyCamera();
+  }
+
+  recentre() {
+    if (this.fitSize) this.frame(this.fitSize);
   }
 
   /* ---------------------------------------------------------------- *
@@ -333,7 +665,7 @@ export class Hologram {
 
   resize() {
     const rect = this.canvas.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) return; // panel is hidden; nothing to fit to
+    if (rect.width < 2 || rect.height < 2) return;
 
     const w = Math.floor(rect.width);
     const h = Math.floor(rect.height);
@@ -341,8 +673,6 @@ export class Hologram {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
 
-    // A structure loaded while this panel was hidden was framed against a
-    // meaningless aspect ratio. Refit now, unless the viewer has taken over.
     if (this.fitSize && !this.userAdjusted) this.frame(this.fitSize);
     this.needsRender = true;
   }

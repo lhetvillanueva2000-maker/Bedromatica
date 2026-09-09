@@ -20,7 +20,7 @@
  */
 
 import { parse, write, get, TAG } from "./nbt.js";
-import { classify, isDefaultCut, isTerrainOfAnyKind, CATEGORY } from "./blocks.js";
+import { classify, isGround, isRock, CATEGORY } from "./blocks.js";
 
 export class McStructure {
   /** @param {ArrayBuffer} buffer */
@@ -82,15 +82,29 @@ export class McStructure {
   }
 
   /**
-   * Palette indices ticked for removal on load: loose ground, plants, fluids.
+   * Palette indices ticked for removal.
+   *
+   * The three families are separately switchable because the right answer
+   * depends on the build: a guardian farm needs its water, a tree farm needs
+   * its leaves, and a circuit needs all three left alone.
+   *
    * @param {boolean} includeRock also sweep stone, deepslate and friends
+   * @param {{ground?: boolean, plants?: boolean, fluids?: boolean}} families
    */
-  defaultRemovals(includeRock = false) {
-    const test = includeRock ? isTerrainOfAnyKind : isDefaultCut;
+  defaultRemovals(includeRock = false, families = {}) {
+    const { ground = true, plants = true, fluids = true } = families;
     const out = new Set();
+
     this.palette.forEach((entry, index) => {
-      if (test(entry.name)) out.add(index);
+      const name = entry.name;
+      const category = classify(name);
+
+      if (ground && isGround(name)) out.add(index);
+      else if (plants && category === CATEGORY.PLANT) out.add(index);
+      else if (fluids && category === CATEGORY.FLUID) out.add(index);
+      else if (includeRock && isRock(name)) out.add(index);
     });
+
     return out;
   }
 
@@ -103,15 +117,30 @@ export class McStructure {
    * gap stays a gap) but air trailing off the edges does not inflate the box.
    *
    * @param {Set<number>} removed palette indices to strip
-   * @param {{crop?: boolean, keepEntities?: boolean}} options
+   * @param {{crop?: boolean, keepEntities?: boolean, excludedCells?: Set<number>,
+   *          entityTags?: Array}} options
+   *   excludedCells strips individual cells by index regardless of their block
+   *   type, which is what a dragged region selection produces. entityTags, when
+   *   given, replaces the file's entity list - the caller passes the
+   *   mob-filtered set so keeping entities never smuggles a cow back in.
    */
   export(removed, options = {}) {
-    const { crop = true, keepEntities = false } = options;
+    const {
+      crop = true,
+      keepEntities = false,
+      excludedCells = null,
+      entityTags = null
+    } = options;
     const [sx, sy, sz] = this.size;
     const blocks = this.layers[0] ?? [];
     const water = this.layers[1] ?? [];
 
-    const survives = (p) => p >= 0 && p < this.palette.length && !removed.has(p);
+    const survives = (p, cellIndex) => {
+      if (p < 0 || p >= this.palette.length) return false;
+      if (removed.has(p)) return false;
+      if (excludedCells && excludedCells.has(cellIndex)) return false;
+      return true;
+    };
 
     // 1. Work out the crop window from solid survivors.
     let minX = sx, minY = sy, minZ = sz;
@@ -121,8 +150,9 @@ export class McStructure {
     for (let x = 0; x < sx; x++) {
       for (let y = 0; y < sy; y++) {
         for (let z = 0; z < sz; z++) {
-          const p = blocks[this.indexOf(x, y, z)];
-          if (!survives(p)) continue;
+          const cellIndex = this.indexOf(x, y, z);
+          const p = blocks[cellIndex];
+          if (!survives(p, cellIndex)) continue;
           if (classify(this.palette[p].name) === CATEGORY.AIR) continue;
           solidCount++;
           if (x < minX) minX = x;
@@ -164,7 +194,7 @@ export class McStructure {
           const newIndex = (x * ny + y) * nz + z;
           const p = blocks[oldIndex];
 
-          if (!survives(p)) {
+          if (!survives(p, oldIndex)) {
             newBlocks[newIndex] = -1;
             newWater[newIndex] = -1;
             continue;
@@ -180,7 +210,7 @@ export class McStructure {
 
           // Waterlogging layer only survives if its own palette entry does.
           const w = water[oldIndex];
-          if (survives(w)) {
+          if (survives(w, oldIndex)) {
             let mappedW = remap.get(w);
             if (mappedW === undefined) {
               mappedW = newPaletteTags.length;
@@ -230,7 +260,10 @@ export class McStructure {
 
     structure.v.set("entities", {
       t: TAG.List,
-      v: { et: TAG.Compound, items: keepEntities ? (this.entities?.v.items ?? []) : [] }
+      v: {
+        et: TAG.Compound,
+        items: keepEntities ? (entityTags ?? this.entities?.v.items ?? []) : []
+      }
     });
 
     return {

@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support - Elijah Darius Villanueva</title>
+    <link rel="stylesheet" href="donate-fonts.css">
+    <style>
+        :root {
+            --bg-base: #090d16;
+            --card-bg: rgba(19, 26, 42, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.35);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --input-bg: rgba(15, 23, 42, 0.6);
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px 16px;
+            position: relative;
+        }
+
+        .ambient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.35;
+            animation: float 18s ease-in-out infinite alternate;
+        }
+
+        .blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, #6366f1 0%, transparent 70%); }
+        .blob-2 { bottom: -15%; right: -10%; width: 55vw; height: 55vw; background: radial-gradient(circle, #06b6d4 0%, transparent 70%); animation-delay: -7s; }
+        .blob-3 { top: 40%; left: 30%; width: 35vw; height: 35vw; background: radial-gradient(circle, #10b981 0%, transparent 70%); animation-delay: -12s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(60px, 40px) scale(1.1); }
+            100% { transform: translate(-40px, 80px) scale(0.95); }
+        }
+
+        .support-card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 480px;
+            background: var(--card-bg);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            padding: 32px 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: cardAppear 0.8s var(--ease-spring) forwards;
+        }
+
+        @keyframes cardAppear {
+            from { opacity: 0; transform: translateY(30px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .profile-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .avatar-container {
+            position: relative;
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 14px;
+        }
+
+        .avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            transition: transform 0.3s var(--ease-spring);
+        }
+
+        .avatar-container:hover .avatar {
+            transform: scale(1.05) rotate(-2deg);
+        }
+
+        .profile-title {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .profile-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .amounts-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .amount-btn {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 12px 6px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.25s var(--ease-smooth);
+        }
+
+        .amount-btn:hover {
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .amount-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 20px var(--primary-glow);
+            transform: translateY(-2px);
+        }
+
+        .custom-amount-wrapper {
+            position: relative;
+            margin-bottom: 18px;
+            display: none;
+            animation: fadeIn 0.3s var(--ease-smooth) forwards;
+        }
+
+        .custom-amount-wrapper.show { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .currency-symbol {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .input-field {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 14px 16px 14px 34px;
+            color: var(--text-main);
+            font-size: 15px;
+            font-weight: 600;
+            outline: none;
+            transition: all 0.25s var(--ease-smooth);
+        }
+
+        .input-field:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        /* Account Details Box */
+        .details-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .detail-item {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .detail-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .detail-val {
+            font-size: 14px;
+            font-weight: 700;
+            color: #f1f5f9;
+            letter-spacing: 0.02em;
+        }
+
+        .copy-chip {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .copy-chip:hover {
+            background: var(--primary);
+            color: #ffffff;
+        }
+
+        /* Downloadable QR Section */
+        .qr-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .qr-download-link {
+            display: inline-block;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .qr-image-wrapper {
+            background: #ffffff;
+            padding: 10px;
+            border-radius: 16px;
+            width: 190px;
+            height: 190px;
+            margin: 0 auto 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: transform 0.25s var(--ease-spring), border-color 0.25s ease;
+            border: 2px solid transparent;
+        }
+
+        .qr-download-link:hover .qr-image-wrapper {
+            transform: scale(1.04);
+            border-color: var(--primary);
+        }
+
+        .qr-image-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .qr-missing {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 14px;
+            text-align: center;
+            color: #0f172a;
+        }
+
+        .qr-missing strong { font-size: 14px; font-weight: 800; }
+        .qr-missing span { font-size: 11px; line-height: 1.45; color: #475569; }
+        .qr-missing code {
+            background: #e2e8f0;
+            border-radius: 4px;
+            padding: 1px 4px;
+            font-size: 10.5px;
+        }
+        .qr-missing .qr-warn { color: #b45309; font-weight: 700; }
+
+        .qr-hint {
+            font-size: 12px;
+            color: #38bdf8;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        /* Supported Apps Accordion */
+        .accordion-btn {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--card-border);
+            color: var(--text-muted);
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.25s ease;
+            margin-bottom: 16px;
+        }
+
+        .accordion-btn:hover {
+            color: var(--text-main);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .accordion-content {
+            display: none;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 20px;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .accordion-content.show { display: block; }
+
+        .category-block {
+            margin-bottom: 16px;
+        }
+
+        .category-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .category-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #38bdf8;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chip-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .app-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #cbd5e1;
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+            border: none;
+            color: #ffffff;
+            padding: 16px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px var(--primary-glow);
+            transition: all 0.3s var(--ease-spring);
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px var(--primary-glow);
+        }
+
+        .success-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--card-bg);
+            backdrop-filter: blur(28px);
+            border-radius: 28px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s var(--ease-smooth);
+            z-index: 10;
+        }
+
+        .success-overlay.show { opacity: 1; pointer-events: all; }
+
+        .checkmark-icon {
+            width: 68px;
+            height: 68px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 2px solid #10b981;
+            color: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            margin-bottom: 18px;
+        }
+
+        .reset-btn {
+            margin-top: 20px;
+            background: transparent;
+            border: 1px solid var(--card-border);
+            color: var(--text-muted);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-bg">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="support-card">
+        
+        <!-- Native SVG Thumbs-Up Cat Avatar -->
+        <div class="profile-header">
+            <div class="avatar-container">
+                <svg class="avatar" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="260" height="260" fill="#ffffff"/>
+                    <!-- Giant Thumbs-Up Arm & Hand -->
+                    <path d="M 115 135 C 145 135 180 135 190 132 C 210 128 225 105 210 80 C 200 62 182 65 178 88 L 175 102 C 160 102 145 110 115 115" 
+                          fill="none" stroke="#111111" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    
+                    <!-- Body & Legs -->
+                    <path d="M 82 140 L 72 200 C 70 212 55 210 58 198 L 72 155 C 68 165 72 205 85 208 C 95 210 102 195 100 180 L 108 140" 
+                          fill="none" stroke="#111111" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+                          
+                    <!-- Head & Ears Outline -->
+                    <path d="M 52 110 C 45 105 35 80 42 70 C 50 60 62 72 68 80 C 80 78 95 78 105 80 C 112 72 122 60 130 70 C 138 80 128 105 120 110 C 110 128 62 128 52 110 Z" 
+                          fill="#ffffff" stroke="#111111" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+                    <!-- Large Black Eyes -->
+                    <ellipse cx="68" cy="100" rx="14" ry="17" fill="#111111"/>
+                    <ellipse cx="102" cy="100" rx="14" ry="17" fill="#111111"/>
+                    
+                    <!-- Tail -->
+                    <path d="M 102 170 C 122 170 132 160 128 148 C 125 138 115 140 116 148" 
+                          fill="none" stroke="#111111" stroke-width="6" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h1 class="profile-title">Elijah Darius Villanueva</h1>
+            <p class="profile-subtitle">Maya & InstaPay QR Ph Support</p>
+        </div>
+
+        <!-- Tier Amount Selection -->
+        <span class="section-label">Select Amount</span>
+        <div class="amounts-grid">
+            <button class="amount-btn" data-value="50">₱50</button>
+            <button class="amount-btn active" data-value="100">₱100</button>
+            <button class="amount-btn" data-value="500">₱500</button>
+            <button class="amount-btn" data-value="custom">Custom</button>
+        </div>
+
+        <!-- Custom Amount Field -->
+        <div class="custom-amount-wrapper" id="customAmountWrapper">
+            <span class="currency-symbol">₱</span>
+            <input type="number" class="input-field" id="customInput" placeholder="Enter custom amount" min="1">
+        </div>
+
+        <!-- Direct Details Section -->
+        <span class="section-label">Account Details</span>
+        <div class="details-list">
+            <div class="detail-item">
+                <div class="detail-info">
+                    <span class="detail-label">Maya Username</span>
+                    <span class="detail-val">@Usersainyy</span>
+                </div>
+                <button class="copy-chip" onclick="copyText('@Usersainyy', this)">Copy</button>
+            </div>
+            <div class="detail-item">
+                <div class="detail-info">
+                    <span class="detail-label">Mobile Number</span>
+                    <span class="detail-val">0991 - 878 - 4266</span>
+                </div>
+                <button class="copy-chip" onclick="copyText('09918784266', this)">Copy</button>
+            </div>
+            <div class="detail-item">
+                <div class="detail-info">
+                    <span class="detail-label">Maya Bank Number</span>
+                    <span class="detail-val">8054 4920 5899</span>
+                </div>
+                <button class="copy-chip" onclick="copyText('805449205899', this)">Copy</button>
+            </div>
+        </div>
+
+        <!-- Tap to Download QR Code -->
+        <span class="section-label">Scan or Tap to Download QR Code</span>
+        <div class="qr-card">
+            <a href="donate-qr.png" download="InstaPay_QR_Elijah.png" class="qr-download-link" title="Tap to Download QR Code" id="qrLink">
+                <div class="qr-image-wrapper">
+                    <img src="donate-qr.png" alt="InstaPay QR Ph code" id="qrImage">
+                    <div class="qr-missing" id="qrMissing" hidden>
+                        <strong>QR not added yet</strong>
+                        <span>Save your real InstaPay QR as <code>donate-qr.png</code> next to this page and it will appear here.</span>
+                        <span class="qr-warn">Use the account details above in the meantime.</span>
+                    </div>
+                </div>
+            </a>
+            <div class="qr-hint" id="qrHint">
+                <span>↓ Tap QR Code to save image</span>
+            </div>
+        </div>
+
+        <!-- Supported Apps Accordion -->
+        <button class="accordion-btn" onclick="toggleAccordion()">
+            <span>View Supported Apps & Banks</span>
+            <span id="accordionArrow">▼</span>
+        </button>
+
+        <div class="accordion-content" id="accordionContent">
+            
+            <div class="category-block">
+                <div class="category-title">📱 E-Wallets & Digital Money</div>
+                <div class="chip-group">
+                    <span class="app-chip">GCash</span>
+                    <span class="app-chip">GrabPay</span>
+                    <span class="app-chip">ShopeePay</span>
+                    <span class="app-chip">Coins.ph</span>
+                    <span class="app-chip">PalawanPay</span>
+                    <span class="app-chip">Vybe by BPI</span>
+                    <span class="app-chip">Starpay</span>
+                    <span class="app-chip">JuanCash</span>
+                    <span class="app-chip">TayoCash</span>
+                </div>
+            </div>
+
+            <div class="category-block">
+                <div class="category-title">⚡ Digital & Neo Banks</div>
+                <div class="chip-group">
+                    <span class="app-chip">GoTyme Bank</span>
+                    <span class="app-chip">SeaBank</span>
+                    <span class="app-chip">Tonik Bank</span>
+                    <span class="app-chip">Uno Digital Bank</span>
+                    <span class="app-chip">Cebuana Lhuillier Bank</span>
+                </div>
+            </div>
+
+            <div class="category-block">
+                <div class="category-title">🏛️ Major Traditional Banks</div>
+                <div class="chip-group">
+                    <span class="app-chip">BDO Unibank</span>
+                    <span class="app-chip">BPI</span>
+                    <span class="app-chip">UnionBank</span>
+                    <span class="app-chip">Metrobank</span>
+                    <span class="app-chip">RCBC</span>
+                    <span class="app-chip">Landbank</span>
+                    <span class="app-chip">PNB</span>
+                    <span class="app-chip">China Bank</span>
+                    <span class="app-chip">Security Bank</span>
+                    <span class="app-chip">EastWest Bank</span>
+                    <span class="app-chip">PSBank</span>
+                    <span class="app-chip">AUB</span>
+                    <span class="app-chip">AllBank</span>
+                </div>
+            </div>
+
+            <div class="category-block">
+                <div class="category-title">💳 Loans & Credit Apps</div>
+                <div class="chip-group">
+                    <span class="app-chip">Maya Easy Credit</span>
+                    <span class="app-chip">Maya Personal Loan</span>
+                    <span class="app-chip">BillEase</span>
+                    <span class="app-chip">Tala Philippines</span>
+                    <span class="app-chip">JuanHand</span>
+                    <span class="app-chip">Digido</span>
+                    <span class="app-chip">Cashalo</span>
+                    <span class="app-chip">Home Credit</span>
+                    <span class="app-chip">Mocasa</span>
+                    <span class="app-chip">OLP</span>
+                    <span class="app-chip">Finbro</span>
+                    <span class="app-chip">Pesoloan</span>
+                </div>
+            </div>
+
+            <div class="category-block">
+                <div class="category-title">🌐 International & Cross-Border</div>
+                <div class="chip-group">
+                    <span class="app-chip">Wise</span>
+                    <span class="app-chip">DBS Digibank</span>
+                    <span class="app-chip">OCBC Digital</span>
+                    <span class="app-chip">UOB TMRW</span>
+                    <span class="app-chip">NETS PayNow</span>
+                    <span class="app-chip">MAE by Maybank</span>
+                    <span class="app-chip">CIMB OCTO</span>
+                    <span class="app-chip">Touch 'n Go</span>
+                    <span class="app-chip">K PLUS</span>
+                    <span class="app-chip">SCB EASY</span>
+                    <span class="app-chip">Bangkok Bank</span>
+                    <span class="app-chip">BCA Mobile</span>
+                    <span class="app-chip">Livin' by Mandiri</span>
+                    <span class="app-chip">GoPay</span>
+                    <span class="app-chip">KakaoPay</span>
+                    <span class="app-chip">Naver Pay</span>
+                    <span class="app-chip">Toss</span>
+                    <span class="app-chip">PayCo</span>
+                    <span class="app-chip">Alipay / Alipay+</span>
+                    <span class="app-chip">WeChat Pay</span>
+                    <span class="app-chip">UnionPay</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Submit Button -->
+        <button class="submit-btn" onclick="confirmTransfer()">
+            I'm sending <span id="btnAmountDisplay">₱100</span>
+        </button>
+
+        <!-- Success Overlay -->
+        <div class="success-overlay" id="successOverlay">
+            <div class="checkmark-icon">✓</div>
+            <h2 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Thank You!</h2>
+            <p style="color: var(--text-muted); font-size: 14px; line-height: 1.5;">Your contribution to Elijah Darius Villanueva is greatly appreciated!</p>
+            <button class="reset-btn" onclick="resetForm()">Done</button>
+        </div>
+
+    </div>
+
+    <script>
+        // No remote fallback: a payment QR that does not match the real account
+        // would send money to the wrong place, so an absent file says so.
+        (function () {
+            const img = document.getElementById('qrImage');
+            const missing = document.getElementById('qrMissing');
+            const hint = document.getElementById('qrHint');
+            const link = document.getElementById('qrLink');
+            img.addEventListener('error', function () {
+                img.hidden = true;
+                missing.hidden = false;
+                hint.hidden = true;
+                link.removeAttribute('href');
+                link.removeAttribute('download');
+            });
+        })();
+
+        let currentAmount = 100;
+
+        const amountBtns = document.querySelectorAll('.amount-btn');
+        const customWrapper = document.getElementById('customAmountWrapper');
+        const customInput = document.getElementById('customInput');
+        const btnAmountDisplay = document.getElementById('btnAmountDisplay');
+
+        amountBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                amountBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                const val = btn.getAttribute('data-value');
+                if (val === 'custom') {
+                    customWrapper.classList.add('show');
+                    customInput.focus();
+                    updateDisplay(customInput.value || 0);
+                } else {
+                    customWrapper.classList.remove('show');
+                    currentAmount = parseInt(val);
+                    updateDisplay(currentAmount);
+                }
+            });
+        });
+
+        customInput.addEventListener('input', (e) => {
+            currentAmount = e.target.value ? parseFloat(e.target.value) : 0;
+            updateDisplay(currentAmount);
+        });
+
+        function updateDisplay(val) {
+            btnAmountDisplay.textContent = `₱${val}`;
+        }
+
+        function copyText(text, element) {
+            navigator.clipboard.writeText(text);
+            const originalText = element.textContent;
+            element.textContent = 'Copied!';
+            element.style.background = '#10b981';
+            element.style.color = '#ffffff';
+            setTimeout(() => {
+                element.textContent = originalText;
+                element.style.background = '';
+                element.style.color = '';
+            }, 2000);
+        }
+
+        function toggleAccordion() {
+            const content = document.getElementById('accordionContent');
+            const arrow = document.getElementById('accordionArrow');
+            content.classList.toggle('show');
+            arrow.textContent = content.classList.contains('show') ? '▲' : '▼';
+        }
+
+        function confirmTransfer() {
+            document.getElementById('successOverlay').classList.add('show');
+        }
+
+        function resetForm() {
+            document.getElementById('successOverlay').classList.remove('show');
+        }
+    </script>
+</body>
+</html>
+

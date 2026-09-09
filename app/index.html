@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <title>Schem Bench</title>
-<meta name="description" content="Pull individual builds out of a Minecraft Bedrock world export, strip the terrain, and save clean .mcstructure files.">
+<meta name="description" content="Open a Minecraft Bedrock world export, pick a build out of it, strip the terrain, and save a clean .mcstructure.">
 <meta name="theme-color" content="#0A1420">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -28,20 +28,30 @@
       <span>Bedrock structure extractor</span>
     </div>
   </div>
-  <label class="btn btn-primary" for="worldInput">
-    <input id="worldInput" type="file" hidden>
-    Open world
-  </label>
+  <div class="bar-actions">
+    <button class="btn btn-quiet" id="supportOpen" title="Support the developer">
+      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+        <path d="M12 20s-7-4.6-7-9.3A4 4 0 0 1 12 8a4 4 0 0 1 7 2.7C19 15.4 12 20 12 20z"
+              fill="currentColor"/>
+      </svg>
+      <span>Support</span>
+    </button>
+    <label class="btn btn-primary" for="worldInput">
+      <input id="worldInput" type="file" hidden>
+      Open world
+    </label>
+  </div>
 </header>
 
 <main id="app" class="layout">
 
-  <!-- ---------- structures ---------- -->
-  <section class="rail" id="railStructures" data-panel="structures">
+  <!-- ---------- structures + assistant ---------- -->
+  <section class="rail" data-panel="structures">
     <div class="rail-head">
       <h2>Structures</h2>
       <span class="tally" id="structureTally">none loaded</span>
     </div>
+
     <div class="rail-body" id="structureList">
       <div class="empty" id="emptyState">
         <div class="empty-art" aria-hidden="true">
@@ -55,14 +65,23 @@
         <p class="fine">Also reads <code>.mctemplate</code>, <code>.mcpack</code>, <code>.mcaddon</code>, a plain <code>.zip</code> of a world folder, a zip with a world <em>inside</em> it, or one bare <code>.mcstructure</code>. Nothing leaves your device.</p>
       </div>
     </div>
+
+    <div class="card card-assistant" id="assistantCard" hidden>
+      <div class="card-head">
+        <span class="card-title">Assistant</span>
+        <span class="conf" id="assistConfidence"></span>
+      </div>
+      <div class="assist-type" id="assistType">&mdash;</div>
+      <p class="assist-advice" id="assistAdvice"></p>
+      <button class="btn btn-ghost btn-wide" id="assistApply">Apply this filter</button>
+    </div>
   </section>
 
   <!-- ---------- hologram ---------- -->
   <section class="stage" data-panel="view">
     <canvas id="stage"></canvas>
-    <div class="stage-empty" id="stageEmpty">
-      <span>No structure selected</span>
-    </div>
+    <div class="stage-empty" id="stageEmpty"><span>No world loaded</span></div>
+
     <div class="stage-hud" id="stageHud" hidden>
       <div class="hud-line" id="hudName">&mdash;</div>
       <div class="hud-stats">
@@ -70,15 +89,20 @@
         <span id="hudKept" class="chip chip-keep">&mdash;</span>
         <span id="hudCut" class="chip chip-cut">&mdash;</span>
       </div>
+      <div class="hud-pick" id="hudPick" hidden></div>
+      <p class="stage-hint" id="stageHint" hidden>Tap a block to inspect &middot; hold and drag to select a region</p>
     </div>
+
     <div class="stage-tools" id="stageTools" hidden>
       <button class="tool" id="toggleGhosts" aria-pressed="true">Ghosts</button>
-      <button class="tool" id="recenter">Recenter</button>
+      <button class="tool" id="toggleEntities" aria-pressed="true">Entities</button>
+      <button class="tool" id="recenter">Recentre</button>
     </div>
+
   </section>
 
-  <!-- ---------- blocks + export ---------- -->
-  <section class="rail rail-right" id="railBlocks" data-panel="blocks">
+  <!-- ---------- blocks, tools, export ---------- -->
+  <section class="rail rail-right" data-panel="blocks">
     <div class="rail-head">
       <h2>Blocks</h2>
       <span class="tally" id="blockTally">&mdash;</span>
@@ -95,6 +119,42 @@
       <p class="hint">Load a world to see what a structure is made of.</p>
     </div>
 
+    <div class="cards" id="toolCards" hidden>
+      <div class="card" id="selectionCard" hidden>
+        <div class="card-head">
+          <span class="card-title">Selection</span>
+          <button class="mini" id="selectionClear">Clear</button>
+        </div>
+        <div class="card-line" id="selectionInfo">&mdash;</div>
+        <div class="card-actions">
+          <button class="pill" id="selCut">Cut selection</button>
+          <button class="pill" id="selKeep">Keep only this</button>
+        </div>
+      </div>
+
+      <div class="card" id="leverCard" hidden>
+        <div class="card-head">
+          <span class="card-title">Levers</span>
+          <span class="tally" id="leverTally">&mdash;</span>
+        </div>
+        <div class="card-line" id="leverInfo">Tap a lever in the 3D view to flip it.</div>
+        <div class="card-actions">
+          <button class="pill" id="leversOn">All on</button>
+          <button class="pill" id="leversOff">All off</button>
+        </div>
+        <p class="fine" id="leverCaveat" hidden></p>
+      </div>
+
+      <div class="card" id="entityCard" hidden>
+        <div class="card-head">
+          <span class="card-title">Entities</span>
+          <span class="tally" id="entityTally">&mdash;</span>
+        </div>
+        <div class="card-line" id="entityInfo">&mdash;</div>
+        <p class="fine">Mobs are never included &mdash; only frames, stands, paintings, carts and displays.</p>
+      </div>
+    </div>
+
     <div class="export" id="exportPanel" hidden>
       <div class="opts">
         <label class="opt">
@@ -103,20 +163,27 @@
         </label>
         <label class="opt">
           <input type="checkbox" id="optEntities">
-          <span><b>Keep entities</b><em>Mobs, item frames, armour stands</em></span>
+          <span><b>Keep entities</b><em>Frames, stands, carts &mdash; never mobs</em></span>
         </label>
       </div>
       <div class="result" id="exportResult" hidden></div>
       <button class="btn btn-primary btn-wide" id="exportBtn">Save structure</button>
-      <p class="fine" id="exportNote">Stripped blocks become structure void, so pasting will not carve a hole in your world.</p>
+      <p class="fine">Stripped blocks become structure void, so pasting will not carve a hole in your world.</p>
     </div>
+  </section>
+
+  <!-- ---------- support ---------- -->
+  <section class="support" data-panel="support">
+    <button class="support-back" id="supportBack">&lsaquo; Back to the bench</button>
+    <iframe id="supportFrame" title="Support the developer" src="about:blank" loading="lazy"></iframe>
   </section>
 </main>
 
 <nav class="tabs" id="tabs">
-  <button class="tab is-on" data-tab="structures">Structures</button>
+  <button class="tab is-on" data-tab="structures">Builds</button>
   <button class="tab" data-tab="view">View</button>
   <button class="tab" data-tab="blocks">Blocks</button>
+  <button class="tab" data-tab="support">Support</button>
 </nav>
 
 <div class="toast" id="toast" hidden></div>
