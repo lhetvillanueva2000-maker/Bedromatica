@@ -29,6 +29,11 @@
     </div>
   </div>
   <div class="bar-actions">
+    <div class="zoomer" role="group" aria-label="Interface size">
+      <button class="zoom-btn" id="zoomOut" title="Smaller interface">&minus;</button>
+      <span class="zoom-val" id="zoomVal">100%</span>
+      <button class="zoom-btn" id="zoomIn" title="Larger interface">+</button>
+    </div>
     <button class="btn btn-quiet" id="supportOpen" title="Support the developer">
       <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
         <path d="M12 20s-7-4.6-7-9.3A4 4 0 0 1 12 8a4 4 0 0 1 7 2.7C19 15.4 12 20 12 20z"
@@ -120,6 +125,27 @@
     </div>
 
     <div class="cards" id="toolCards" hidden>
+      <div class="card" id="terrainCard" hidden>
+        <div class="card-head">
+          <span class="card-title">World terrain</span>
+          <span class="tally" id="terrainTally">&mdash;</span>
+        </div>
+        <div class="card-line" id="terrainInfo">&mdash;</div>
+        <label class="slider">
+          <span>Radius <b id="radiusVal">4</b> chunks</span>
+          <input type="range" id="radiusRange" min="1" max="16" value="4">
+        </label>
+        <label class="slider">
+          <span>Top level <b id="sliceVal">320</b></span>
+          <input type="range" id="sliceRange" min="-64" max="320" value="320">
+        </label>
+        <div class="card-actions">
+          <button class="pill" id="terrainToggle" aria-pressed="true">Hide terrain</button>
+          <button class="pill" id="terrainFocus">Go to terrain</button>
+          <button class="pill" id="terrainReload">Reload region</button>
+        </div>
+      </div>
+
       <div class="card" id="selectionCard" hidden>
         <div class="card-head">
           <span class="card-title">Selection</span>

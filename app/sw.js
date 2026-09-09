@@ -7,7 +7,9 @@
  * gets the 3D view and the zip reader.
  */
 
-const CACHE = "schem-bench-v1";
+// Bumped whenever the shell list changes: activate drops every other cache, so
+// a returning visitor gets the new files instead of a half-old shell.
+const CACHE = "schem-bench-v2";
 
 const SHELL = [
   ".",
@@ -20,6 +22,16 @@ const SHELL = [
   "js/blocks.js",
   "js/mcstructure.js",
   "js/viewer.js",
+  "js/entities.js",
+  "js/assistant.js",
+  "js/redstone.js",
+  "js/textures.js",
+  "js/leveldb.js",
+  "js/bedrock-world.js",
+  "js/terrain-worker.js",
+  "js/terrain-inline.js",
+  "donate.html",
+  "donate-fonts.css",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "vendor/three.min.js",

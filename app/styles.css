@@ -814,3 +814,89 @@ b { color: var(--paper); font-weight: 600; }
 
 .support-back:active { background: #16294a; }
 .support { position: relative; }
+
+/* ------------------------------------------------------------------ *
+ * Interface zoom
+ * ------------------------------------------------------------------ */
+
+.zoomer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 2px;
+  flex: none;
+}
+
+.zoom-btn {
+  width: 30px;
+  height: 32px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--paper-dim);
+  background: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.zoom-btn:active { background: #16294a; color: var(--paper); }
+.zoom-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+
+.zoom-val {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--paper-faint);
+  min-width: 34px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 620px) {
+  .zoom-val { display: none; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Sliders
+ * ------------------------------------------------------------------ */
+
+.slider { display: flex; flex-direction: column; gap: 5px; }
+
+.slider > span {
+  font-size: 11.5px;
+  color: var(--paper-dim);
+  display: flex;
+  justify-content: space-between;
+}
+
+.slider b {
+  font-family: var(--f-mono);
+  color: var(--cyan);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.slider input[type="range"] {
+  width: 100%;
+  height: 26px;
+  accent-color: var(--cyan-deep);
+  background: transparent;
+  cursor: pointer;
+}
+
+/* The zoom controls compete with the title on a phone. Below these widths the
+   subtitle, then the wordmark, give way rather than letting anything wrap. */
+@media (max-width: 700px) {
+  .mark-text span { display: none; }
+  .mark-text strong { white-space: nowrap; }
+  .bar { gap: 8px; }
+  .btn { padding: 9px 12px; }
+}
+
+@media (max-width: 430px) {
+  .mark-text { display: none; }
+  .zoomer { padding: 1px; }
+  .zoom-btn { width: 28px; }
+}

@@ -67,6 +67,7 @@ export class Hologram {
     this.ghost = null;
     this.power = null;
     this.entityGroup = null;
+    this.terrainGroup = null;
     this.grid = null;
 
     /** Parallel to the solid mesh's instance ids, for picking. */
@@ -272,6 +273,149 @@ export class Hologram {
     }
 
     return group;
+  }
+
+  /**
+   * Terrain, as typed arrays straight from the worker.
+   *
+   * Split into 64x64 tiles rather than one giant InstancedMesh, because an
+   * InstancedMesh's bounding sphere comes from its geometry, not from where its
+   * instances actually sit. One mesh spanning a whole world therefore has a
+   * one-block bounding sphere and either never culls or culls wrongly; per-tile
+   * meshes each get a true bound, so frustum culling can be switched on and the
+   * GPU skips everything off screen.
+   *
+   * @param {{count:number, names:string[], x:Int32Array, y:Int32Array, z:Int32Array, id:Uint16Array}} cells
+   */
+  setTerrain(cells) {
+    this.clearTerrain();
+    if (!cells || !cells.count) return 0;
+
+    const TILE = 64;
+    const tiles = new Map();
+    for (let i = 0; i < cells.count; i++) {
+      const key = `${Math.floor(cells.x[i] / TILE)},${Math.floor(cells.z[i] / TILE)}`;
+      let list = tiles.get(key);
+      if (!list) tiles.set(key, (list = []));
+      list.push(i);
+    }
+
+    const group = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const white = new Float32Array(geometry.attributes.position.count * 3).fill(1);
+    geometry.setAttribute("color", new THREE.BufferAttribute(white, 3));
+
+    const material = new THREE.MeshLambertMaterial({
+      map: this.detail,
+      vertexColors: true,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1
+    });
+
+    const matrix = new THREE.Matrix4();
+    const colour = new THREE.Color();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3(1, 1, 1);
+    const quat = new THREE.Quaternion();
+
+    // Colour is looked up once per distinct block name, not once per cell.
+    const palette = cells.names.map((n) => new THREE.Color(blockColor(n)));
+
+    for (const indices of tiles.values()) {
+      const mesh = new THREE.InstancedMesh(geometry, material, indices.length);
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+      for (let n = 0; n < indices.length; n++) {
+        const i = indices[n];
+        const x = cells.x[i] + 0.5;
+        const y = cells.y[i] + 0.5;
+        const z = cells.z[i] + 0.5;
+        position.set(x, y, z);
+        matrix.compose(position, quat, scale);
+        mesh.setMatrixAt(n, matrix);
+        colour.copy(palette[cells.id[i]] ?? palette[0]);
+        mesh.setColorAt(n, colour);
+
+        if (x < minX) minX = x; if (y < minY) minY = y; if (z < minZ) minZ = z;
+        if (x > maxX) maxX = x; if (y > maxY) maxY = y; if (z > maxZ) maxZ = z;
+      }
+
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+      // A real bound for this tile, so culling can be trusted.
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+      mesh.geometry = geometry;
+      mesh.boundingSphereOverride = new THREE.Sphere(
+        new THREE.Vector3(cx, cy, cz),
+        0.5 * Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) + 1
+      );
+      mesh.frustumCulled = false;
+      mesh.userData.bounds = mesh.boundingSphereOverride;
+      mesh.renderOrder = -1;
+      group.add(mesh);
+    }
+
+    this.terrainGroup = group;
+    this.terrainTiles = [...group.children];
+    this.scene.add(group);
+    this.needsRender = true;
+    return cells.count;
+  }
+
+  /**
+   * Points the camera at the loaded terrain.
+   *
+   * Captured builds and the terrain around them are often hundreds of blocks
+   * apart vertically, so framing one leaves the other off screen entirely.
+   */
+  focusTerrain() {
+    if (!this.terrainTiles?.length) return false;
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    for (const tile of this.terrainTiles) {
+      const b = tile.userData.bounds;
+      minX = Math.min(minX, b.center.x - b.radius);
+      minY = Math.min(minY, b.center.y - b.radius);
+      minZ = Math.min(minZ, b.center.z - b.radius);
+      maxX = Math.max(maxX, b.center.x + b.radius);
+      maxY = Math.max(maxY, b.center.y + b.radius);
+      maxZ = Math.max(maxZ, b.center.z + b.radius);
+    }
+
+    this.centre = new THREE.Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+    this.frame([maxX - minX, maxY - minY, maxZ - minZ]);
+    return true;
+  }
+
+  clearTerrain() {
+    if (!this.terrainGroup) return;
+    for (const child of this.terrainGroup.children) child.material.dispose();
+    this.terrainGroup.children[0]?.geometry.dispose();
+    this.scene.remove(this.terrainGroup);
+    this.terrainGroup = null;
+    this.terrainTiles = [];
+    this.needsRender = true;
+  }
+
+  /**
+   * Hides tiles whose bounds are outside the camera frustum. Done by hand
+   * because three cannot cull an InstancedMesh correctly on its own.
+   */
+  cullTerrain() {
+    if (!this.terrainTiles?.length) return;
+    this.camera.updateMatrixWorld();
+    const m = new THREE.Matrix4().multiplyMatrices(
+      this.camera.projectionMatrix,
+      this.camera.matrixWorldInverse
+    );
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(m);
+    for (const tile of this.terrainTiles) {
+      tile.visible = frustum.intersectsSphere(tile.userData.bounds);
+    }
   }
 
   /** Additive glow over whatever the levers are currently powering. */
@@ -682,6 +826,7 @@ export class Hologram {
     requestAnimationFrame(() => this.loop());
     if (!this.needsRender) return;
     this.needsRender = false;
+    this.cullTerrain();
     this.renderer.render(this.scene, this.camera);
   }
 }

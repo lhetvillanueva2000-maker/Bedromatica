@@ -163,7 +163,11 @@ class Reader {
 
 /**
  * @param {ArrayBuffer} buffer
- * @returns {{name: string, tag: {t: number, v: any}}}
+ * @returns {{name: string, tag: {t: number, v: any}, consumed: number}}
+ *   `consumed` is how many bytes the root tag occupied. A block palette in a
+ *   Bedrock subchunk is a run of compounds packed back to back with no length
+ *   prefix, so the only way to reach the next one is to know where this one
+ *   ended.
  */
 export function parse(buffer) {
   const r = new Reader(buffer);
@@ -172,7 +176,8 @@ export function parse(buffer) {
     throw new Error("Not a .mcstructure: the file does not start with an NBT compound.");
   }
   const name = r.str();
-  return { name, tag: { t, v: r.payload(t) } };
+  const value = r.payload(t);
+  return { name, tag: { t, v: value }, consumed: r.off };
 }
 
 /* ------------------------------------------------------------------ *

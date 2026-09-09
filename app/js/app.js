@@ -26,7 +26,10 @@ for (const id of [
   "toolCards", "selectionCard", "selectionInfo", "selectionClear", "selCut", "selKeep",
   "leverCard", "leverTally", "leverInfo", "leversOn", "leversOff", "leverCaveat",
   "entityCard", "entityTally", "entityInfo", "supportFrame",
-  "supportOpen", "supportBack"
+  "supportOpen", "supportBack",
+  "zoomIn", "zoomOut", "zoomVal",
+  "terrainCard", "terrainTally", "terrainInfo", "radiusRange", "radiusVal",
+  "sliceRange", "sliceVal", "terrainToggle", "terrainReload", "terrainFocus"
 ]) ui[id] = $(id);
 
 const state = {
@@ -35,7 +38,8 @@ const state = {
   loaded: [],
   active: -1,
   redstone: null,
-  selection: null
+  selection: null,
+  terrain: { worker: null, ready: false, bounds: null, chunks: 0, centre: { x: 0, z: 0 } }
 };
 
 let holo = null;
@@ -94,6 +98,35 @@ function boot() {
   });
 
   ui.recenter.addEventListener("click", () => holo?.recentre());
+
+  ui.zoomIn.addEventListener("click", () => nudgeZoom(+1));
+  ui.zoomOut.addEventListener("click", () => nudgeZoom(-1));
+  applyZoom(readStoredZoom());
+
+  ui.radiusRange.addEventListener("input", () => {
+    ui.radiusVal.textContent = ui.radiusRange.value;
+  });
+  ui.sliceRange.addEventListener("input", () => {
+    ui.sliceVal.textContent = ui.sliceRange.value;
+  });
+  // Only refetch when the drag ends: each slice is real work in the worker.
+  ui.radiusRange.addEventListener("change", requestSlice);
+  ui.sliceRange.addEventListener("change", requestSlice);
+  ui.terrainReload.addEventListener("click", requestSlice);
+  ui.terrainFocus.addEventListener("click", () => {
+    if (holo?.focusTerrain()) showPanel("view");
+    else toast("No terrain loaded from this world.", true);
+  });
+
+  ui.terrainToggle.addEventListener("click", () => {
+    const on = ui.terrainToggle.getAttribute("aria-pressed") !== "true";
+    ui.terrainToggle.setAttribute("aria-pressed", String(on));
+    ui.terrainToggle.textContent = on ? "Hide terrain" : "Show terrain";
+    if (holo?.terrainGroup) {
+      holo.terrainGroup.visible = on;
+      holo.needsRender = true;
+    }
+  });
 
   for (const el of [ui.optCrop, ui.optEntities]) {
     el.addEventListener("change", () => {
@@ -186,6 +219,10 @@ async function readArchive(file) {
     }
   }
 
+  // Terrain is optional and slow, so it is kicked off in the background and
+  // the structures appear immediately rather than waiting on it.
+  loadTerrain(zip).catch((err) => console.warn("terrain:", err.message));
+
   if (!found.length) {
     throw new Error(
       "No .mcstructure files in there. Save a build with the Schem Table first, then export the world."
@@ -193,6 +230,188 @@ async function readArchive(file) {
   }
   found.sort((a, b) => a.name.localeCompare(b.name));
   return found;
+}
+
+/* ------------------------------------------------------------------ *
+ * Terrain
+ * ------------------------------------------------------------------ */
+
+/** Hands the world database to the worker; nothing here touches the UI thread. */
+async function loadTerrain(zip) {
+  const dbFiles = [];
+  zip.forEach((path, entry) => {
+    if (entry.dir) return;
+    if (/(^|\/)db\/[^/]+\.(ldb|log)$/i.test(path)) dbFiles.push({ path, entry });
+  });
+
+  if (!dbFiles.length) return;
+
+  ui.terrainCard.hidden = false;
+  ui.terrainInfo.textContent = `Reading ${dbFiles.length} database files…`;
+
+  const files = [];
+  for (const f of dbFiles) {
+    files.push({ name: f.path.split("/").pop(), bytes: await f.entry.async("arraybuffer") });
+  }
+
+  state.terrain.worker?.terminate();
+  const worker = await startTerrainWorker();
+  state.terrain.worker = worker;
+  state.terrain.ready = false;
+
+  // Transferring costs nothing on a real worker and is not available to the
+  // inline stand-in, which shares the buffers directly instead.
+  if (worker.transfers) {
+    worker.postMessage({ type: "parse", payload: { files } }, files.map((f) => f.bytes));
+  } else {
+    worker.postMessage({ type: "parse", payload: { files } });
+  }
+}
+
+/**
+ * A module worker where the WebView supports one, the same reader on the main
+ * thread where it does not.
+ *
+ * Construction succeeding is not proof the worker runs - a WebView that cannot
+ * fetch the script fails later and silently - so this waits for the worker to
+ * say it loaded before anything is handed to it. That matters more than the
+ * millisecond it costs: the world buffers are transferred, and transferring
+ * them into a dead worker would detach them with no way to read them back.
+ */
+function startTerrainWorker() {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer = null; // declared up here: the constructor can throw before it is set
+
+    const fallback = async (why) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      console.warn("terrain: worker unavailable, reading inline —", why);
+      const { createInlineTerrain } = await import("./terrain-inline.js");
+      resolve(createInlineTerrain(onTerrainMessage));
+    };
+
+    let worker;
+    try {
+      worker = new Worker("js/terrain-worker.js", { type: "module" });
+    } catch (err) {
+      fallback(err.message);
+      return;
+    }
+
+    timer = setTimeout(() => {
+      worker.terminate();
+      fallback("no response from the worker");
+    }, 4000);
+
+    worker.onmessage = (event) => {
+      if (event.data?.type === "ready") {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        worker.transfers = true;
+        resolve(worker);
+        return;
+      }
+      onTerrainMessage(event.data);
+    };
+
+    worker.onerror = (e) => {
+      if (settled) {
+        ui.terrainInfo.textContent = `Terrain unavailable: ${e.message}`;
+        return;
+      }
+      worker.terminate();
+      fallback(e.message || "worker script failed to load");
+    };
+  });
+}
+
+function onTerrainMessage(msg) {
+  if (msg.type === "progress") {
+    ui.terrainInfo.textContent = `Reading database… ${msg.done}/${msg.total}`;
+  } else if (msg.type === "parsed") {
+    state.terrain.ready = true;
+    state.terrain.bounds = msg.bounds;
+    state.terrain.chunks = msg.chunks;
+    ui.terrainTally.textContent = `${msg.chunks} chunks`;
+    ui.terrainInfo.textContent =
+      `${msg.subchunks.toLocaleString()} subchunks from ${msg.tables} table${msg.tables === 1 ? "" : "s"}` +
+      (msg.logs ? ` and ${msg.logs} log${msg.logs === 1 ? "" : "s"}` : "") +
+      (msg.skipped ? ` · ${msg.skipped} skipped` : "");
+    // Centre on the builds if there are any, otherwise on the world itself.
+    const item = active();
+    state.terrain.centre = item
+      ? { x: item.structure.origin[0] >> 4, z: item.structure.origin[2] >> 4 }
+      : { x: Math.round((msg.bounds.minX + msg.bounds.maxX) / 2),
+          z: Math.round((msg.bounds.minZ + msg.bounds.maxZ) / 2) };
+    requestSlice();
+  } else if (msg.type === "slice") {
+    const drawn = holo?.setTerrain(msg) ?? 0;
+    if (holo?.terrainGroup) {
+      holo.terrainGroup.visible = ui.terrainToggle.getAttribute("aria-pressed") === "true";
+    }
+    ui.terrainTally.textContent = `${drawn.toLocaleString()} blocks`;
+    if (msg.truncated) {
+      toast("Region hit the block cap. Lower the radius to see it all.");
+    }
+  } else if (msg.type === "warn") {
+    console.warn("terrain:", msg.message);
+  } else if (msg.type === "error") {
+    ui.terrainInfo.textContent = msg.message;
+  }
+}
+
+function requestSlice() {
+  if (!state.terrain.ready || !state.terrain.worker) return;
+  ui.radiusVal.textContent = ui.radiusRange.value;
+  ui.sliceVal.textContent = ui.sliceRange.value;
+  state.terrain.worker.postMessage({
+    type: "slice",
+    payload: {
+      centre: state.terrain.centre,
+      radius: Number(ui.radiusRange.value),
+      yMin: -64,
+      yMax: Number(ui.sliceRange.value),
+      limit: 400000
+    }
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Interface zoom
+ * ------------------------------------------------------------------ */
+
+const ZOOM_STEPS = [0.75, 0.85, 1, 1.15, 1.3, 1.5, 1.75];
+
+function readStoredZoom() {
+  try {
+    const saved = Number(localStorage.getItem("schembench.zoom"));
+    return ZOOM_STEPS.includes(saved) ? saved : 1;
+  } catch {
+    return 1; // private browsing, or storage switched off
+  }
+}
+
+function applyZoom(scale) {
+  // `zoom` reflows rather than merely scaling pixels, so text stays sharp and
+  // the 3D canvas is handed a real size rather than a stretched one.
+  document.body.style.zoom = String(scale);
+  ui.zoomVal.textContent = `${Math.round(scale * 100)}%`;
+  try {
+    localStorage.setItem("schembench.zoom", String(scale));
+  } catch {
+    /* not worth failing over */
+  }
+  requestAnimationFrame(() => holo?.resize());
+}
+
+function nudgeZoom(direction) {
+  const current = readStoredZoom();
+  const at = ZOOM_STEPS.indexOf(current);
+  const next = ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, at + direction))];
+  applyZoom(next);
 }
 
 /** Parses every structure up front so the whole world can be drawn at once. */
